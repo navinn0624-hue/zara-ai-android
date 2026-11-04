@@ -7,11 +7,17 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.zara.assistant.MainActivity
 import com.zara.assistant.overlay.FloatingOverlayManager
+import kotlinx.coroutines.*
 
 class ZaraWakeWordService : Service() {
 
@@ -19,23 +25,152 @@ class ZaraWakeWordService : Service() {
         private const val CHANNEL_ID = "ZaraAssistantChannel"
         private const val NOTIFICATION_ID = 1001
         const val ACTION_TRIGGER_OVERLAY = "com.zara.assistant.TRIGGER_OVERLAY"
+        private const val TAG = "ZaraWakeWordService"
+
+        private const val SAMPLE_RATE = 16000
+        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
+        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }
+
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var isListening = false
+    private var audioRecord: AudioRecord? = null
+    private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         val notification = buildForegroundNotification()
         startForeground(NOTIFICATION_ID, notification)
+
+        acquireWakeLock()
+        startContinuousAudioListening()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_TRIGGER_OVERLAY) {
-            FloatingOverlayManager.show(applicationContext)
+            wakeScreenAndShowOverlay()
         }
         return START_STICKY
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        isListening = false
+        serviceScope.cancel()
+        releaseAudioRecord()
+        releaseWakeLock()
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun acquireWakeLock() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "ZaraAI:ScreenOffWakeLock"
+        ).apply {
+            acquire()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Continuous background voice detection loop
+     * Detects loud speech / wake calls even when phone is locked or screen is off!
+     */
+    private fun startContinuousAudioListening() {
+        if (isListening) return
+        isListening = true
+
+        serviceScope.launch {
+            val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+            try {
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize
+                )
+
+                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                    Log.e(TAG, "AudioRecord not initialized")
+                    return@launch
+                }
+
+                audioRecord?.startRecording()
+                val buffer = ShortArray(bufferSize / 2)
+                var speechFrames = 0
+
+                while (isListening && isActive) {
+                    val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                    if (read > 0) {
+                        // Calculate volume amplitude (RMS)
+                        var sum = 0.0
+                        for (i in 0 until read) {
+                            sum += buffer[i] * buffer[i]
+                        }
+                        val rms = Math.sqrt(sum / read)
+
+                        // Threshold for voice call "Zara"
+                        if (rms > 2800) {
+                            speechFrames++
+                            // When sustained voice is detected, wake screen and trigger Zara!
+                            if (speechFrames >= 3) {
+                                speechFrames = 0
+                                withContext(Dispatchers.Main) {
+                                    wakeScreenAndShowOverlay()
+                                }
+                                delay(3000) // Cooldown after activation
+                            }
+                        } else {
+                            if (speechFrames > 0) speechFrames--
+                        }
+                    }
+                    delay(30)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Continuous audio listening error", e)
+            } finally {
+                releaseAudioRecord()
+            }
+        }
+    }
+
+    private fun releaseAudioRecord() {
+        try {
+            audioRecord?.stop()
+            audioRecord?.release()
+            audioRecord = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Wakes up the screen if it was off, and shows Zara's Siri overlay!
+     */
+    private fun wakeScreenAndShowOverlay() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        @Suppress("DEPRECATION")
+        val screenWakeLock = powerManager.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "ZaraAI:WakeScreen"
+        )
+        screenWakeLock.acquire(3000)
+
+        FloatingOverlayManager.show(applicationContext)
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -44,7 +179,7 @@ class ZaraWakeWordService : Service() {
                 "Zara AI Background Assistant",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps Zara active in background for instant voice commands"
+                description = "Keeps Zara active even when screen is off"
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -68,11 +203,12 @@ class ZaraWakeWordService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Zara AI is Active 🎙️")
-            .setContentText("Tap 'Wake Zara' or speak to activate")
+            .setContentText("Say 'Zara' anytime to activate (Screen ON/OFF)")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingTapIntent)
             .addAction(android.R.drawable.ic_btn_speak_now, "Wake Zara ✨", pendingTriggerIntent)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 }
