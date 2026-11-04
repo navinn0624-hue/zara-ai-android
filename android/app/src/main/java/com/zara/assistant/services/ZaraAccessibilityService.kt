@@ -19,6 +19,8 @@ class ZaraAccessibilityService : AccessibilityService() {
     private var pendingContactName: String? = null
     private var pendingMessageText: String? = null
     private var automationStep = AutomationStep.IDLE
+    private val handler = Handler(Looper.getMainLooper())
+    private var retryCount = 0
 
     enum class AutomationStep {
         IDLE,
@@ -62,7 +64,6 @@ class ZaraAccessibilityService : AccessibilityService() {
         val pm = packageManager
         val cleanName = appName.lowercase().trim()
 
-        // Known direct package mappings for popular apps
         val directPackages = mapOf(
             "insta" to "com.instagram.android",
             "instagram" to "com.instagram.android",
@@ -88,7 +89,7 @@ class ZaraAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Fuzzy match across ALL installed apps
+        // Search through all launchable apps
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
@@ -115,49 +116,63 @@ class ZaraAccessibilityService : AccessibilityService() {
         pendingContactName = contact
         pendingMessageText = message
         automationStep = AutomationStep.OPENING_WHATSAPP
+        retryCount = 0
 
         val pm = packageManager
         val launchIntent = pm.getLaunchIntentForPackage("com.whatsapp")
         if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(launchIntent)
 
-            // Transition to searching contact after WhatsApp loads
-            Handler(Looper.getMainLooper()).postDelayed({
+            // Step 1: Wait for WhatsApp to open and initiate contact search
+            handler.postDelayed({
                 automationStep = AutomationStep.SEARCHING_CONTACT
                 rootInActiveWindow?.let { handleWhatsAppAutomation(it) }
-            }, 1200)
+            }, 1000)
         }
     }
 
     private fun handleWhatsAppAutomation(root: AccessibilityNodeInfo) {
         when (automationStep) {
             AutomationStep.SEARCHING_CONTACT -> {
-                // Find Search button in WhatsApp
+                // Find Search Icon / Button
                 val searchButtons = root.findAccessibilityNodeInfosByViewId("com.whatsapp:id/menuitem_search")
                 if (searchButtons.isNotEmpty()) {
                     searchButtons[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    Handler(Looper.getMainLooper()).postDelayed({
+                    handler.postDelayed({
                         typeContactName(rootInActiveWindow ?: root)
-                    }, 500)
+                    }, 400)
                 } else {
-                    // Try by content description
-                    findNodeByTextOrDesc(root, "Search")?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        typeContactName(rootInActiveWindow ?: root)
-                    }, 500)
+                    val searchNode = findNodeByTextOrDesc(root, "Search") ?: findNodeByTextOrDesc(root, "தேடு")
+                    if (searchNode != null) {
+                        clickNodeOrParent(searchNode)
+                        handler.postDelayed({
+                            typeContactName(rootInActiveWindow ?: root)
+                        }, 400)
+                    } else if (retryCount < 5) {
+                        retryCount++
+                        handler.postDelayed({
+                            rootInActiveWindow?.let { handleWhatsAppAutomation(it) }
+                        }, 400)
+                    }
                 }
             }
 
             AutomationStep.OPENING_CHAT -> {
-                // Click the first contact row in search results
+                // Find and click the contact name in the search results list
                 val contactNode = findNodeByTextOrDesc(root, pendingContactName ?: "")
                 if (contactNode != null) {
                     clickNodeOrParent(contactNode)
                     automationStep = AutomationStep.TYPING_MESSAGE
-                    Handler(Looper.getMainLooper()).postDelayed({
+                    retryCount = 0
+                    handler.postDelayed({
                         rootInActiveWindow?.let { typeAndSendTextMessage(it) }
-                    }, 1000)
+                    }, 900)
+                } else if (retryCount < 5) {
+                    retryCount++
+                    handler.postDelayed({
+                        rootInActiveWindow?.let { handleWhatsAppAutomation(it) }
+                    }, 500)
                 }
             }
 
@@ -177,14 +192,16 @@ class ZaraAccessibilityService : AccessibilityService() {
             }
             searchBoxes[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
             automationStep = AutomationStep.OPENING_CHAT
+            retryCount = 0
 
-            Handler(Looper.getMainLooper()).postDelayed({
+            handler.postDelayed({
                 rootInActiveWindow?.let { handleWhatsAppAutomation(it) }
-            }, 800)
+            }, 700)
         }
     }
 
     private fun typeAndSendTextMessage(root: AccessibilityNodeInfo) {
+        // Find WhatsApp message text entry field
         val entryBoxes = root.findAccessibilityNodeInfosByViewId("com.whatsapp:id/entry")
         if (entryBoxes.isNotEmpty()) {
             val args = Bundle().apply {
@@ -193,15 +210,20 @@ class ZaraAccessibilityService : AccessibilityService() {
             entryBoxes[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
 
             // Click Send Button
-            Handler(Looper.getMainLooper()).postDelayed({
+            handler.postDelayed({
                 val sendButtons = (rootInActiveWindow ?: root).findAccessibilityNodeInfosByViewId("com.whatsapp:id/send")
                 if (sendButtons.isNotEmpty()) {
                     sendButtons[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    Log.d(TAG, "WhatsApp Message successfully typed and sent by Zara!")
                     automationStep = AutomationStep.IDLE
                     pendingContactName = null
                     pendingMessageText = null
-                    Log.d(TAG, "WhatsApp Message sent successfully via Zara!")
                 }
+            }, 400)
+        } else if (retryCount < 5) {
+            retryCount++
+            handler.postDelayed({
+                rootInActiveWindow?.let { typeAndSendTextMessage(it) }
             }, 400)
         }
     }
