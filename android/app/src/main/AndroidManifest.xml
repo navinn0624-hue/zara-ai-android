@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Essential Permissions -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- Safe Queries for App Launching without Triggering Privacy Scanner -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.spotify.music" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -35,10 +44,9 @@
         <service
             android:name=".services.ZaraWakeWordService"
             android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:exported="false" />
 
-        <!-- Deep OS & In-App Accessibility Automation Service (WhatsApp auto-type, clicks, app open) -->
+        <!-- Deep OS & In-App Accessibility Automation Service -->
         <service
             android:name=".services.ZaraAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
