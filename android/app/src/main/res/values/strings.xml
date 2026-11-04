@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Zara AI</string>
+    <string name="accessibility_service_desc">Zara AI needs Accessibility Permission to automate in-app actions like opening WhatsApp, searching contacts, and typing messages hands-free.</string>
+    <string name="notification_channel_name">Zara AI Background Service</string>
+    <string name="notification_desc">Listening for 'Hey Zara' wake word in background</string>
+</resources>
