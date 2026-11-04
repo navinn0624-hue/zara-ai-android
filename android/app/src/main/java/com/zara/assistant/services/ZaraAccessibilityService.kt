@@ -77,7 +77,7 @@ class ZaraAccessibilityService : AccessibilityService() {
             "gpay" to "com.google.android.apps.nbu.paisa.user"
         )
 
-        for ((key, pkg) to directPackages) {
+        for ((key, pkg) in directPackages) {
             if (cleanName.contains(key)) {
                 val launchIntent = pm.getLaunchIntentForPackage(pkg)
                 if (launchIntent != null) {
