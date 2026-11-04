@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
@@ -35,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         tvServiceStatus = findViewById(R.id.tvServiceStatus)
 
         requestMicrophonePermission()
+        requestBatteryOptimizationExemption()
         setupListeners()
     }
 
@@ -58,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         btnGrantAccessibility.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
-            Toast.makeText(this, "Find 'Zara AI' in the list and turn it ON", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Find 'Zara AI' and turn it ON", Toast.LENGTH_LONG).show()
         }
 
         btnTestZara.setOnClickListener {
@@ -91,7 +93,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (hasOverlay && hasAccessibility) {
-            tvServiceStatus.text = "Status: Zara is Active & Ready! 🚀"
+            tvServiceStatus.text = "Status: Zara is Active 24/7! 🚀 (Screen ON/OFF)"
         } else {
             tvServiceStatus.text = "Status: Waiting for permissions..."
         }
@@ -117,6 +119,25 @@ class MainActivity : AppCompatActivity() {
     private fun requestMicrophonePermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
+        }
+    }
+
+    /**
+     * Prevents Android from putting Zara to sleep when screen is turned off!
+     */
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
