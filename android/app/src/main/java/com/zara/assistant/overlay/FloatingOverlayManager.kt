@@ -13,6 +13,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -38,6 +39,7 @@ object FloatingOverlayManager {
         val inflater = LayoutInflater.from(context)
         overlayView = inflater.inflate(R.layout.layout_floating_orb, null)
 
+        @Suppress("DEPRECATION")
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -46,11 +48,14 @@ object FloatingOverlayManager {
             else
                 WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM
-            y = 80
+            y = 70
         }
 
         windowManager?.addView(overlayView, layoutParams)
@@ -58,16 +63,15 @@ object FloatingOverlayManager {
         // Haptic feedback
         vibrate(context)
 
-        // Setup Text To Speech
+        // Initialize Natural Female Voice (TTS)
         initTTS(context)
 
-        // Setup View Listeners
-        val btnClose = overlayView?.findViewById<ImageView>(R.id.btnCloseOverlay)
-        btnClose?.setOnClickListener {
+        // Setup Close Button
+        overlayView?.findViewById<ImageView>(R.id.btnCloseOverlay)?.setOnClickListener {
             dismiss()
         }
 
-        // Start listening to voice command
+        // Start listening to voice command in Tamil/Tanglish/English
         startSpeechListening(context)
     }
 
@@ -94,11 +98,12 @@ object FloatingOverlayManager {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ta-IN")
             putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-IN", "ta"))
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
 
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                tvStatus?.text = "Listening... Speak in Tamil or English"
+                tvStatus?.text = "Listening... Speak in Tamil, English, or Tanglish ✨"
             }
 
             override fun onBeginningOfSpeech() {}
@@ -109,7 +114,7 @@ object FloatingOverlayManager {
             }
 
             override fun onError(error: Int) {
-                tvStatus?.text = "Didn't catch that. Tap close and try again."
+                tvStatus?.text = "Didn't catch that. Please speak again."
             }
 
             override fun onResults(results: Bundle?) {
@@ -140,16 +145,16 @@ object FloatingOverlayManager {
         VoiceBrainEngine.process(command, object : VoiceBrainEngine.CommandCallback {
             override fun onWhatsAppSend(contact: String, message: String) {
                 tvStatus?.text = "Opening WhatsApp & sending to $contact..."
-                speak("WhatsApp-la $contact-ku message anupuren")
+                speak("WhatsApp-la $contact-ku message anupuren...")
 
                 val service = ZaraAccessibilityService.instance
                 if (service != null) {
                     service.sendWhatsAppMessage(contact, message)
                 } else {
-                    tvStatus?.text = "Please enable Accessibility Permission for Zara!"
+                    tvStatus?.text = "Please turn ON Accessibility for Zara in Settings!"
                 }
 
-                autoDismiss(2500)
+                autoDismiss(2800)
             }
 
             override fun onAppOpen(appName: String) {
@@ -159,7 +164,6 @@ object FloatingOverlayManager {
                 val service = ZaraAccessibilityService.instance
                 val opened = service?.launchAppByName(appName) ?: false
                 if (!opened) {
-                    // Fallback using direct context intent
                     val pm = context.packageManager
                     val intent = pm.getLaunchIntentForPackage("com.$appName.android")
                     if (intent != null) {
@@ -174,31 +178,51 @@ object FloatingOverlayManager {
             override fun onConversational(reply: String) {
                 tvStatus?.text = reply
                 speak(reply)
-                autoDismiss(3000)
+                autoDismiss(3200)
             }
         })
     }
 
+    /**
+     * Natural sweet female voice for Zara
+     */
     private fun initTTS(context: Context) {
         if (textToSpeech == null) {
             textToSpeech = TextToSpeech(context) { status ->
                 if (status == TextToSpeech.SUCCESS) {
-                    textToSpeech?.language = Locale("ta", "IN")
+                    textToSpeech?.apply {
+                        language = Locale("ta", "IN")
+                        setPitch(1.15f) // Feminine energetic pitch
+                        setSpeechRate(1.02f)
+
+                        // Choose high quality female voice if available on device
+                        val voices = voices ?: emptySet()
+                        for (voice in voices) {
+                            val name = voice.name.lowercase()
+                            if ((name.contains("female") || name.contains("#female") || name.contains("f00")) &&
+                                (voice.locale.language == "ta" || voice.locale.language == "en")
+                            ) {
+                                this.voice = voice
+                                break
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
     private fun speak(text: String) {
-        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ZARA_TTS")
+        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ZARA_FEMALE_TTS")
     }
 
     private fun vibrate(context: Context) {
         val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+            vibrator?.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
-            vibrator?.vibrate(100)
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(120)
         }
     }
 
