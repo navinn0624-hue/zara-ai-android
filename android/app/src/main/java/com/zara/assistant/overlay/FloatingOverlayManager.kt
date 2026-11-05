@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.hardware.camera2.CameraManager
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -42,7 +43,7 @@ object FloatingOverlayManager {
     private var rotateAnimator: ObjectAnimator? = null
 
     fun show(context: Context) {
-        if (overlayView != null) return // Already active
+        if (overlayView != null) return
 
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val inflater = LayoutInflater.from(context)
@@ -69,16 +70,10 @@ object FloatingOverlayManager {
 
         windowManager?.addView(overlayView, layoutParams)
 
-        // Haptic tap
         vibrate(context)
-
-        // Start iPhone Siri Glowing Orb Animations
         startSiriAnimations()
-
-        // Init Natural Female TTS
         initTTS(context)
 
-        // Setup Close Button & Tap-to-Speak on Orb
         overlayView?.findViewById<ImageView>(R.id.btnCloseOverlay)?.setOnClickListener {
             dismiss()
         }
@@ -87,7 +82,6 @@ object FloatingOverlayManager {
             startSpeechListening(context)
         }
 
-        // Start speech listening in Tamil/Tanglish/English
         startSpeechListening(context)
     }
 
@@ -106,15 +100,10 @@ object FloatingOverlayManager {
         }
     }
 
-    /**
-     * Exact iPhone Siri Breathing Scale & Rotating Gradient Animations
-     */
     private fun startSiriAnimations() {
-        val orbCore = overlayView?.findViewById<View>(R.id.viewGlowCore) ?: return
         val orbMiddle = overlayView?.findViewById<View>(R.id.viewGlowMiddle) ?: return
         val orbOuter = overlayView?.findViewById<View>(R.id.viewGlowOuter) ?: return
 
-        // Siri Breathing Pulse (Scale 0.93f -> 1.14f)
         val scaleX = PropertyValuesHolder.ofFloat(View.SCALE_X, 0.93f, 1.14f)
         val scaleY = PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.93f, 1.14f)
         pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(orbMiddle, scaleX, scaleY).apply {
@@ -125,7 +114,6 @@ object FloatingOverlayManager {
             start()
         }
 
-        // Siri Ambient Halo Slow Rotation
         rotateAnimator = ObjectAnimator.ofFloat(orbOuter, View.ROTATION, 0f, 360f).apply {
             duration = 10000
             repeatCount = ValueAnimator.INFINITE
@@ -145,8 +133,8 @@ object FloatingOverlayManager {
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ta-IN")
-            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-IN", "ta"))
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("ta-IN", "ta", "en-US"))
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
@@ -158,9 +146,6 @@ object FloatingOverlayManager {
 
             override fun onBeginningOfSpeech() {}
 
-            /**
-             * Real-time Audio Visualizer: Siri Orb expands and glows with user voice volume!
-             */
             override fun onRmsChanged(rmsdB: Float) {
                 val orbMiddle = overlayView?.findViewById<View>(R.id.viewGlowMiddle)
                 val orbCore = overlayView?.findViewById<View>(R.id.viewGlowCore)
@@ -235,7 +220,7 @@ object FloatingOverlayManager {
                     }
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    tvStatus?.text = "Timer set failed: ${e.message}"
+                    tvStatus?.text = "Timer error: ${e.message}"
                 }
                 autoDismiss(2200)
             }
@@ -255,9 +240,39 @@ object FloatingOverlayManager {
                     }
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    tvStatus?.text = "Alarm set failed: ${e.message}"
+                    tvStatus?.text = "Alarm error: ${e.message}"
                 }
                 autoDismiss(2200)
+            }
+
+            override fun onVolumeChange(raise: Boolean, mute: Boolean) {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                if (mute) {
+                    audioManager.adjustVolume(AudioManager.ADJUST_MUTE, AudioManager.FLAG_SHOW_UI)
+                    tvStatus?.text = "Muted Phone Volume 🔇"
+                    speak("Phone-ah silent panniten")
+                } else if (raise) {
+                    audioManager.adjustVolume(AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                    tvStatus?.text = "Increased Volume 🔊"
+                    speak("Volume kootitten")
+                } else {
+                    audioManager.adjustVolume(AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                    tvStatus?.text = "Lowered Volume 🔉"
+                    speak("Volume koraichitten")
+                }
+                autoDismiss(1800)
+            }
+
+            override fun onOpenSettingsPage(action: String, title: String) {
+                tvStatus?.text = "Opening $title..."
+                speak("$title open panren")
+                try {
+                    val intent = Intent(action).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {}
+                autoDismiss(1800)
             }
 
             override fun onToggleTorch(enable: Boolean) {
@@ -328,7 +343,7 @@ object FloatingOverlayManager {
             override fun onConversational(reply: String) {
                 tvStatus?.text = reply
                 speak(reply)
-                autoDismiss(5000)
+                autoDismiss(5500)
             }
         })
     }
