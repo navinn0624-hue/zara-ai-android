@@ -42,7 +42,16 @@ object VoiceBrainEngine {
         val lower = spokenText.lowercase().trim()
         val cleaned = lower.replace(Regex("^(hey\\s+)?(zara|சாரா|ஜாரா)[\\s,]*"), "").trim()
 
-        // 1. WhatsApp Intent (Tamil, Tanglish & English)
+        // 1. Direct Hands-Free Phone Call
+        // Examples: "call amma", "amma ku call pannu", "call 9876543210", "அம்மாவுக்கு கால் பண்ணு"
+        if (cleaned.contains("call") || cleaned.contains("கால்") || cleaned.contains("டயல்")) {
+            var target = cleaned.replace(Regex("(?:call|phone|ku|பண்ணு|டயல்|பண்ணுங்க|போடு|போடுங்க|-ku)"), " ").trim()
+            if (target.isEmpty()) target = "Amma"
+            callback.onPhoneCall(target)
+            return
+        }
+
+        // 2. WhatsApp Intent (Tamil, Tanglish & English)
         if (cleaned.contains("whatsapp") || cleaned.contains("வாட்ஸ்அப்") || cleaned.contains("வாட்சப்") || cleaned.contains("watsap")) {
             var contact = "Amma"
             var message = "Hi"
@@ -68,7 +77,17 @@ object VoiceBrainEngine {
             return
         }
 
-        // 2. Timer Automation
+        // 3. Hands-Free Open ANY App
+        // Examples: "open instagram", "free fire open pannu", "open chrome", "gallery open பண்ணு"
+        if (cleaned.startsWith("open ") || cleaned.contains(" open") || cleaned.contains("திற")) {
+            val appTarget = cleaned.replace(Regex("(?:open|திற|app|ஆப்|pannu|பண்ணு|போ|po)"), " ").trim()
+            if (appTarget.isNotEmpty()) {
+                callback.onAppOpen(appTarget)
+                return
+            }
+        }
+
+        // 4. Timer Automation
         if (cleaned.contains("timer") || cleaned.contains("டைமர்")) {
             var seconds = 60
             val numMatch = Regex("(\\d+)\\s*(minute|minutes|min|mins|nimisham|second|seconds|sec|secs)?").find(cleaned)
@@ -81,7 +100,7 @@ object VoiceBrainEngine {
             return
         }
 
-        // 3. Alarm Automation
+        // 5. Alarm Automation
         if (cleaned.contains("alarm") || cleaned.contains("அலாரம்")) {
             var hour = 7
             var minute = 0
@@ -99,7 +118,7 @@ object VoiceBrainEngine {
             return
         }
 
-        // 4. Volume Control
+        // 6. Volume Control
         if (cleaned.contains("volume") || cleaned.contains("சத்தம்") || cleaned.contains("sound")) {
             val isMute = cleaned.contains("mute") || cleaned.contains("silent") || cleaned.contains("shut")
             val isRaise = cleaned.contains("increase") || cleaned.contains("kootu") || cleaned.contains("up") || cleaned.contains("adheegam")
@@ -107,14 +126,14 @@ object VoiceBrainEngine {
             return
         }
 
-        // 5. Torch / Flashlight
+        // 7. Torch / Flashlight
         if (cleaned.contains("torch") || cleaned.contains("flashlight") || cleaned.contains("டார்ச்")) {
             val enable = !cleaned.contains("off") && !cleaned.contains("stop") && !cleaned.contains("moodu")
             callback.onToggleTorch(enable)
             return
         }
 
-        // 6. Wi-Fi & Bluetooth Controls
+        // 8. Wi-Fi & Bluetooth Controls
         if (cleaned.contains("wifi") || cleaned.contains("வைஃபை")) {
             callback.onOpenSettingsPage(Settings.ACTION_WIFI_SETTINGS, "Wi-Fi Settings")
             return
@@ -124,7 +143,7 @@ object VoiceBrainEngine {
             return
         }
 
-        // 7. Battery Check
+        // 9. Battery Check
         if (cleaned.contains("battery") || cleaned.contains("பேட்டரி")) {
             val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -132,14 +151,7 @@ object VoiceBrainEngine {
             return
         }
 
-        // 8. Phone Calls
-        if (cleaned.contains("call") || cleaned.contains("கால்") || cleaned.contains("டயல்")) {
-            val target = cleaned.replace(Regex("(?:call|phone|ku|பண்ணு|டயல்)"), "").trim()
-            callback.onPhoneCall(if (target.isNotEmpty()) target else "9876543210")
-            return
-        }
-
-        // 9. YouTube Search & Play
+        // 10. YouTube Search & Play
         if (cleaned.contains("youtube") || cleaned.contains("யூடியூப்") || cleaned.contains("paattu") || cleaned.contains("song") || cleaned.contains("பாட்டு")) {
             val query = cleaned.replace(Regex("(?:youtube|யூடியூப்|la|open|pannu|podu|play|search|paattu|song|பாட்டு)"), " ")
                 .trim().replace(Regex("\\s+"), " ")
@@ -147,37 +159,37 @@ object VoiceBrainEngine {
             return
         }
 
-        // 10. Instagram
+        // 11. Instagram
         if (cleaned.contains("insta") || cleaned.contains("instagram") || cleaned.contains("இன்ஸ்டா")) {
             callback.onAppOpen("instagram")
             return
         }
 
-        // 11. Camera / Selfie
+        // 12. Camera / Selfie
         if (cleaned.contains("camera") || cleaned.contains("photo") || cleaned.contains("selfie") || cleaned.contains("கேமரா")) {
             callback.onAppOpen("camera")
             return
         }
 
-        // 12. Spotify
+        // 13. Spotify
         if (cleaned.contains("spotify") || cleaned.contains("ஸ்பாடிபை")) {
             callback.onAppOpen("spotify")
             return
         }
 
-        // 13. Settings
+        // 14. Settings
         if (cleaned.contains("setting") || cleaned.contains("செட்டிங்ஸ்")) {
             callback.onAppOpen("settings")
             return
         }
 
-        // 14. Calculator
+        // 15. Calculator
         if (cleaned.contains("calc") || cleaned.contains("calculator") || cleaned.contains("கல்குலேட்டர்")) {
             callback.onAppOpen("calculator")
             return
         }
 
-        // 15. Intelligent Gemini / AI Question Answering
+        // 16. Intelligent Gemini / AI Question Answering
         askGeminiOrVercel(context, cleaned, callback)
     }
 
