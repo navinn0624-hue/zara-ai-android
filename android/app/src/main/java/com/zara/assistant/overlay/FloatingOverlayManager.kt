@@ -211,6 +211,17 @@ object FloatingOverlayManager {
                     val resolved = ContactsHelper.findPhoneNumber(context, contactOrNumber)
                     if (resolved != null) {
                         finalNumber = resolved
+                    } else {
+                        tvStatus?.text = "Contact '$contactOrNumber' not found! 📞"
+                        speak("$contactOrNumber contact list-la kedaikkala. Dial pad open panren.")
+                        try {
+                            val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(dialIntent)
+                        } catch (e: Exception) {}
+                        autoDismiss(2600)
+                        return
                     }
                 }
 
