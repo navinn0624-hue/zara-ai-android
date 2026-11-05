@@ -183,7 +183,57 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Section 3: Gemini AI Brain Configuration -->
+        <!-- Permission 3: Microphone & Background Voice -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMicPerm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/card_dark"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="@color/zinc_700"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="3. Microphone &amp; Notifications"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Required to listen for 'Zara' outside the app"
+                        android:textColor="@color/zinc_400"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnGrantMic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Enable"
+                    android:textSize="12sp"
+                    app:backgroundTint="#FF10B981" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Section 4: Gemini AI Brain Configuration -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardGeminiSetup"
             android:layout_width="match_parent"
@@ -203,7 +253,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🤖 3. Google Gemini AI Brain (Free)"
+                    android:text="🤖 4. Google Gemini AI Brain (Free)"
                     android:textColor="#FF818CF8"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -250,9 +300,10 @@
                     android:id="@+id/tvGetGeminiKey"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="👉 Get 100% Free Key from: aistudio.google.com"
+                    android:text="👉 Tap here to get Free Key from aistudio.google.com"
                     android:textColor="#FF34D399"
                     android:textSize="11sp"
+                    android:textStyle="bold"
                     android:layout_marginTop="6dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
