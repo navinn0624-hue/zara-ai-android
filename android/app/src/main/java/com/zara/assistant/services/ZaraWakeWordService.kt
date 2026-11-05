@@ -1,5 +1,6 @@
 package com.zara.assistant.services
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,6 +15,7 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.zara.assistant.MainActivity
@@ -51,7 +53,7 @@ class ZaraWakeWordService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start foreground with microphone type", e)
+            Log.e(TAG, "Failed startForeground with microphone type", e)
             try {
                 startForeground(NOTIFICATION_ID, notification)
             } catch (ex: Exception) {
@@ -68,6 +70,30 @@ class ZaraWakeWordService : Service() {
             wakeScreenAndShowOverlay()
         }
         return START_STICKY
+    }
+
+    /**
+     * Auto-restart service even if user swipes app away from Recents!
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        try {
+            val restartServiceIntent = Intent(applicationContext, ZaraWakeWordService::class.java).apply {
+                setPackage(packageName)
+            }
+            val restartPendingIntent = PendingIntent.getService(
+                this, 1, restartServiceIntent,
+                PendingIntent.FLAG_ONE_SHOT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+            )
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.set(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + 1000,
+                restartPendingIntent
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "onTaskRemoved restart error", e)
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
@@ -104,10 +130,6 @@ class ZaraWakeWordService : Service() {
         }
     }
 
-    /**
-     * Highly sensitive voice detection loop using VOICE_RECOGNITION audio source
-     * Detects voice calls even when screen is locked or app is in background!
-     */
     private fun startContinuousAudioListening() {
         if (isListening) return
         isListening = true
@@ -127,7 +149,6 @@ class ZaraWakeWordService : Service() {
                     )
 
                     if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                        Log.e(TAG, "AudioRecord init failed, retrying with MIC...")
                         audioRecord = AudioRecord(
                             MediaRecorder.AudioSource.MIC,
                             SAMPLE_RATE,
@@ -138,7 +159,7 @@ class ZaraWakeWordService : Service() {
                     }
 
                     if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                        delay(2500)
+                        delay(2000)
                         continue
                     }
 
@@ -155,8 +176,8 @@ class ZaraWakeWordService : Service() {
                             }
                             val rms = Math.sqrt(sum / read)
 
-                            // Lowered threshold (1100) for effortless activation from 1-2 meters away
-                            if (rms > 1100) {
+                            // Threshold for "Zara" voice call
+                            if (rms > 950) {
                                 speechFrames++
                                 if (speechFrames >= 2) {
                                     speechFrames = 0
@@ -191,9 +212,6 @@ class ZaraWakeWordService : Service() {
         }
     }
 
-    /**
-     * Wakes up the screen if it was off, and shows Zara's Siri overlay!
-     */
     private fun wakeScreenAndShowOverlay() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -242,8 +260,8 @@ class ZaraWakeWordService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Zara AI is Listening 🎙️")
-            .setContentText("Say 'Zara' or tap here to wake Siri overlay")
+            .setContentTitle("Zara AI is Active & Listening 🎙️")
+            .setContentText("Say 'Zara' or tap here anytime to activate")
             .setSmallIcon(R.drawable.ic_launcher_zara)
             .setContentIntent(pendingTapIntent)
             .addAction(R.drawable.ic_launcher_zara, "Wake Siri ✨", pendingTriggerIntent)
