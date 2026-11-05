@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +26,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnGrantAccessibility: Button
     private lateinit var btnTestZara: Button
     private lateinit var tvServiceStatus: TextView
+    private lateinit var etGeminiKey: EditText
+    private lateinit var btnSaveGeminiKey: Button
+    private lateinit var tvGetGeminiKey: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,7 +38,11 @@ class MainActivity : AppCompatActivity() {
         btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility)
         btnTestZara = findViewById(R.id.btnTestZara)
         tvServiceStatus = findViewById(R.id.tvServiceStatus)
+        etGeminiKey = findViewById(R.id.etGeminiKey)
+        btnSaveGeminiKey = findViewById(R.id.btnSaveGeminiKey)
+        tvGetGeminiKey = findViewById(R.id.tvGetGeminiKey)
 
+        loadSavedGeminiKey()
         requestMicrophonePermission()
         requestBatteryOptimizationExemption()
         setupListeners()
@@ -44,6 +52,14 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePermissionStatus()
         startBackgroundWakeServiceIfPermitted()
+    }
+
+    private fun loadSavedGeminiKey() {
+        val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
+        val savedKey = prefs.getString("gemini_api_key", "") ?: ""
+        if (savedKey.isNotEmpty()) {
+            etGeminiKey.setText(savedKey)
+        }
     }
 
     private fun setupListeners() {
@@ -61,6 +77,18 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
             Toast.makeText(this, "Find 'Zara AI' and turn it ON", Toast.LENGTH_LONG).show()
+        }
+
+        btnSaveGeminiKey.setOnClickListener {
+            val key = etGeminiKey.text.toString().trim()
+            val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("gemini_api_key", key).apply()
+            Toast.makeText(this, "Gemini AI Brain Connected! 🧠✨", Toast.LENGTH_SHORT).show()
+        }
+
+        tvGetGeminiKey.setOnClickListener {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
+            startActivity(intent)
         }
 
         btnTestZara.setOnClickListener {
@@ -93,7 +121,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (hasOverlay && hasAccessibility) {
-            tvServiceStatus.text = "Status: Zara is Active 24/7! 🚀 (Screen ON/OFF)"
+            tvServiceStatus.text = "Status: Zara Active 24/7! (Screen ON/OFF)"
         } else {
             tvServiceStatus.text = "Status: Waiting for permissions..."
         }
@@ -117,14 +145,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestMicrophonePermission() {
+        val permissions = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 101)
         }
     }
 
-    /**
-     * Prevents Android from putting Zara to sleep when screen is turned off!
-     */
     private fun requestBatteryOptimizationExemption() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
