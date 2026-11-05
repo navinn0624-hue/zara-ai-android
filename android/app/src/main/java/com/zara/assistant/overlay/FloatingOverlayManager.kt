@@ -1,0 +1,415 @@
+package com.zara.assistant.overlay
+
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
+import android.content.Context
+import android.content.Intent
+import android.graphics.PixelFormat
+import android.hardware.camera2.CameraManager
+import android.media.AudioManager
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.provider.AlarmClock
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
+import android.widget.ImageView
+import android.widget.TextView
+import com.zara.assistant.R
+import com.zara.assistant.engine.AppLauncherHelper
+import com.zara.assistant.engine.ContactsHelper
+import com.zara.assistant.engine.VoiceBrainEngine
+import com.zara.assistant.services.ZaraAccessibilityService
+import java.util.Locale
+
+object FloatingOverlayManager {
+
+    private var overlayView: View? = null
+    private var windowManager: WindowManager? = null
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var textToSpeech: TextToSpeech? = null
+    private var pulseAnimator: ObjectAnimator? = null
+    private var rotateAnimator: ObjectAnimator? = null
+
+    fun show(context: Context) {
+        if (overlayView != null) return
+
+        windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val inflater = LayoutInflater.from(context)
+        overlayView = inflater.inflate(R.layout.layout_floating_orb, null)
+
+        @Suppress("DEPRECATION")
+        val layoutParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = 35
+        }
+
+        try {
+            windowManager?.addView(overlayView, layoutParams)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return
+        }
+
+        vibrate(context)
+        startSiriAnimations()
+        initTTS(context)
+
+        overlayView?.findViewById<ImageView>(R.id.btnCloseOverlay)?.setOnClickListener {
+            dismiss()
+        }
+
+        overlayView?.findViewById<View>(R.id.frameSiriOrb)?.setOnClickListener {
+            startSpeechListening(context)
+        }
+
+        // 100% Hands-free: Starts listening automatically
+        startSpeechListening(context)
+    }
+
+    fun dismiss() {
+        try {
+            pulseAnimator?.cancel()
+            rotateAnimator?.cancel()
+            speechRecognizer?.destroy()
+            speechRecognizer = null
+            if (overlayView != null && windowManager != null) {
+                windowManager?.removeView(overlayView)
+                overlayView = null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun startSiriAnimations() {
+        val orbMiddle = overlayView?.findViewById<View>(R.id.viewGlowMiddle) ?: return
+        val orbOuter = overlayView?.findViewById<View>(R.id.viewGlowOuter) ?: return
+
+        val scaleX = PropertyValuesHolder.ofFloat(View.SCALE_X, 0.93f, 1.14f)
+        val scaleY = PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.93f, 1.14f)
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(orbMiddle, scaleX, scaleY).apply {
+            duration = 1400
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+
+        rotateAnimator = ObjectAnimator.ofFloat(orbOuter, View.ROTATION, 0f, 360f).apply {
+            duration = 10000
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            start()
+        }
+    }
+
+    private fun startSpeechListening(context: Context) {
+        val tvSpeech = overlayView?.findViewById<TextView>(R.id.tvLiveSpeech)
+        val tvStatus = overlayView?.findViewById<TextView>(R.id.tvAssistantStatus)
+
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {}
+
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("ta-IN", "ta", "en-US"))
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                tvStatus?.text = "Listening... Speak now ✨"
+            }
+
+            override fun onBeginningOfSpeech() {}
+
+            override fun onRmsChanged(rmsdB: Float) {
+                val orbMiddle = overlayView?.findViewById<View>(R.id.viewGlowMiddle)
+                val orbCore = overlayView?.findViewById<View>(R.id.viewGlowCore)
+                val boost = 1.0f + (rmsdB / 14f).coerceIn(0f, 0.35f)
+                orbMiddle?.scaleX = boost
+                orbMiddle?.scaleY = boost
+                orbCore?.scaleX = boost * 0.95f
+                orbCore?.scaleY = boost * 0.95f
+            }
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                tvStatus?.text = "Thinking..."
+            }
+
+            override fun onError(error: Int) {
+                tvStatus?.text = "Didn't catch that. Tap orb to speak."
+                autoDismiss(3000)
+            }
+
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val spoken = matches[0]
+                    tvSpeech?.text = "\"$spoken\""
+                    handleCommand(context, spoken)
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    tvSpeech?.text = "\"${matches[0]}\""
+                }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+
+        speechRecognizer?.startListening(intent)
+    }
+
+    private fun handleCommand(context: Context, command: String) {
+        val tvStatus = overlayView?.findViewById<TextView>(R.id.tvAssistantStatus)
+
+        VoiceBrainEngine.process(context, command, object : VoiceBrainEngine.AgentCallback {
+            override fun onExecuteCall(target: String, voiceReply: String) {
+                tvStatus?.text = "Calling $target... 📞"
+                speak(voiceReply)
+
+                var finalNumber = target
+                if (!target.all { it.isDigit() || it == '+' }) {
+                    val resolved = ContactsHelper.findPhoneNumber(context, target)
+                    if (resolved != null) {
+                        finalNumber = resolved
+                    } else {
+                        tvStatus?.text = "Contact '$target' not found! 📞"
+                        speak("$target contact list-la kedaikkala Sir. Dial pad open panren.")
+                        try {
+                            val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(dialIntent)
+                        } catch (e: Exception) {}
+                        autoDismiss(2600)
+                        return
+                    }
+                }
+
+                try {
+                    val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${Uri.encode(finalNumber)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(callIntent)
+                } catch (e: SecurityException) {
+                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(finalNumber)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(dialIntent)
+                } catch (e: Exception) {
+                    tvStatus?.text = "Cannot call: ${e.message}"
+                }
+                autoDismiss(2400)
+            }
+
+            override fun onExecuteAppOpen(appName: String, voiceReply: String) {
+                tvStatus?.text = "Opening $appName..."
+                speak(voiceReply)
+
+                val service = ZaraAccessibilityService.instance
+                var opened = service?.launchAppByName(appName) ?: false
+                if (!opened) {
+                    opened = AppLauncherHelper.launch(context, appName)
+                }
+                autoDismiss(2000)
+            }
+
+            override fun onExecuteWhatsApp(contact: String, message: String, voiceReply: String) {
+                tvStatus?.text = "WhatsApp to $contact: \"$message\""
+                speak(voiceReply)
+
+                val service = ZaraAccessibilityService.instance
+                if (service != null) {
+                    service.sendWhatsAppMessage(contact, message)
+                } else {
+                    tvStatus?.text = "Accessibility required for auto-typing!"
+                }
+                autoDismiss(3000)
+            }
+
+            override fun onExecuteTimer(seconds: Int, label: String, voiceReply: String) {
+                val mins = seconds / 60
+                val secs = seconds % 60
+                val timeStr = if (mins > 0) "$mins min" else "$secs sec"
+                tvStatus?.text = "Timer set: $timeStr ⏱️"
+                speak(voiceReply)
+
+                try {
+                    val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+                        putExtra(AlarmClock.EXTRA_LENGTH, seconds)
+                        putExtra(AlarmClock.EXTRA_MESSAGE, label)
+                        putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {}
+                autoDismiss(2200)
+            }
+
+            override fun onExecuteAlarm(hour: Int, minute: Int, label: String, voiceReply: String) {
+                val timeStr = String.format(Locale.getDefault(), "%02d:%02d", hour, minute)
+                tvStatus?.text = "Alarm set for $timeStr ⏰"
+                speak(voiceReply)
+
+                try {
+                    val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                        putExtra(AlarmClock.EXTRA_HOUR, hour)
+                        putExtra(AlarmClock.EXTRA_MINUTES, minute)
+                        putExtra(AlarmClock.EXTRA_MESSAGE, label)
+                        putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {}
+                autoDismiss(2200)
+            }
+
+            override fun onExecuteVolume(raise: Boolean, mute: Boolean, voiceReply: String) {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                if (mute) {
+                    audioManager.adjustVolume(AudioManager.ADJUST_MUTE, AudioManager.FLAG_SHOW_UI)
+                    tvStatus?.text = "Muted 🔇"
+                } else if (raise) {
+                    audioManager.adjustVolume(AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                    tvStatus?.text = "Volume Up 🔊"
+                } else {
+                    audioManager.adjustVolume(AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                    tvStatus?.text = "Volume Down 🔉"
+                }
+                speak(voiceReply)
+                autoDismiss(1800)
+            }
+
+            override fun onExecuteSettings(action: String, title: String, voiceReply: String) {
+                tvStatus?.text = "Opening $title..."
+                speak(voiceReply)
+                try {
+                    val intent = Intent(action).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {}
+                autoDismiss(1800)
+            }
+
+            override fun onExecuteTorch(enable: Boolean, voiceReply: String) {
+                tvStatus?.text = if (enable) "Torch ON 🔦" else "Torch OFF 🔦"
+                speak(voiceReply)
+
+                try {
+                    val cm = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+                    val cameraId = cm.cameraIdList[0]
+                    cm.setTorchMode(cameraId, enable)
+                } catch (e: Exception) {}
+                autoDismiss(1800)
+            }
+
+            override fun onExecuteYouTube(query: String, voiceReply: String) {
+                tvStatus?.text = "Playing: $query ▶️"
+                speak(voiceReply)
+
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube://results?search_query=${Uri.encode(query)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(query)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(webIntent)
+                }
+                autoDismiss(2200)
+            }
+
+            override fun onConversational(reply: String, display: String) {
+                tvStatus?.text = display.ifEmpty { reply }
+                speak(reply)
+                autoDismiss(7500)
+            }
+        })
+    }
+
+    private fun initTTS(context: Context) {
+        if (textToSpeech == null) {
+            textToSpeech = TextToSpeech(context) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    textToSpeech?.apply {
+                        language = Locale("ta", "IN")
+                        setPitch(1.15f)
+                        setSpeechRate(1.02f)
+
+                        val voices = voices ?: emptySet()
+                        for (voice in voices) {
+                            val name = voice.name.lowercase()
+                            if ((name.contains("female") || name.contains("#female") || name.contains("f00")) &&
+                                (voice.locale.language == "ta" || voice.locale.language == "en")
+                            ) {
+                                this.voice = voice
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun speak(text: String) {
+        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ZARA_FEMALE_TTS")
+    }
+
+    private fun vibrate(context: Context) {
+        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(120)
+        }
+    }
+
+    private fun autoDismiss(delayMs: Long) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            dismiss()
+        }, delayMs)
+    }
+}
