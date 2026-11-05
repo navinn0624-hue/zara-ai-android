@@ -1,201 +1,275 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_dark"
-    android:padding="20dp">
+    android:fillViewport="true">
 
-    <!-- Header -->
-    <TextView
-        android:id="@+id/tvHeaderTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Zara AI Assistant"
-        android:textColor="@color/white"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:layout_marginTop="20dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <TextView
-        android:id="@+id/tvHeaderSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Hands-free Phone Controller (Tamil &amp; English)"
-        android:textColor="@color/zinc_400"
-        android:textSize="13sp"
-        android:layout_marginTop="4dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvHeaderTitle" />
-
-    <!-- Status Indicator Card -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardStatus"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        app:cardBackgroundColor="@color/card_dark"
-        app:cardCornerRadius="16dp"
-        app:strokeColor="@color/zinc_700"
-        app:strokeWidth="1dp"
-        app:layout_constraintTop_toBottomOf="@id/tvHeaderSubtitle">
+        android:orientation="vertical"
+        android:padding="20dp">
 
-        <LinearLayout
+        <!-- Header -->
+        <TextView
+            android:id="@+id/tvHeaderTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zara AI Assistant"
+            android:textColor="@color/white"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/tvHeaderSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="iPhone Siri Style Voice Controller &amp; Gemini AI Brain"
+            android:textColor="@color/zinc_400"
+            android:textSize="13sp"
+            android:layout_marginTop="4dp" />
+
+        <!-- Status Indicator Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_marginTop="20dp"
+            app:cardBackgroundColor="@color/card_dark"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="@color/zinc_700"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:id="@+id/viewStatusDot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:background="@drawable/circle_green" />
+
+                    <TextView
+                        android:id="@+id/tvServiceStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:text="Status: Ready to Listen"
+                        android:textColor="@color/white"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvInstruction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Say 'Zara' anytime (Screen ON or OFF) to activate Siri overlay!"
+                    android:textColor="@color/zinc_400"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Permission 1: Overlay -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardOverlayPerm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="@color/card_dark"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="@color/zinc_700"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="14dp">
 
-                <View
-                    android:id="@+id/viewStatusDot"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:background="@drawable/circle_green" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tvServiceStatus"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1. Display Over Other Apps"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Shows iPhone Siri glowing orb at bottom center"
+                        android:textColor="@color/zinc_400"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnGrantOverlay"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:text="Status: Ready to Listen"
-                    android:textColor="@color/white"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+                    android:text="Enable"
+                    android:textSize="12sp"
+                    app:backgroundTint="@color/indigo_500" />
             </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:id="@+id/tvInstruction"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Say 'Hey Zara' from any screen or app to activate!"
-                android:textColor="@color/zinc_400"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- Permission 1: Overlay -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardOverlayPerm"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        app:cardBackgroundColor="@color/card_dark"
-        app:cardCornerRadius="14dp"
-        app:strokeColor="@color/zinc_700"
-        app:strokeWidth="1dp"
-        app:layout_constraintTop_toBottomOf="@id/cardStatus">
-
-        <LinearLayout
+        <!-- Permission 2: Accessibility Service -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardAccessibilityPerm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="14dp">
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/card_dark"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="@color/zinc_700"
+            app:strokeWidth="1dp">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2. Accessibility Automation"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Automates WhatsApp messaging &amp; opening apps"
+                        android:textColor="@color/zinc_400"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnGrantAccessibility"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Enable"
+                    android:textSize="12sp"
+                    app:backgroundTint="@color/pink_500" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Section 3: Gemini AI Brain Configuration -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardGeminiSetup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/card_dark"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="#FF6366F1"
+            app:strokeWidth="1.2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="1. Display Over Other Apps"
-                    android:textColor="@color/white"
+                    android:text="🤖 3. Google Gemini AI Brain (Free)"
+                    android:textColor="#FF818CF8"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Shows floating Siri overlay over any app"
+                    android:text="Paste your free Gemini API key to make Zara answer any complex question!"
                     android:textColor="@color/zinc_400"
-                    android:textSize="11sp" />
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="10dp">
+
+                    <EditText
+                        android:id="@+id/etGeminiKey"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:background="#20FFFFFF"
+                        android:hint="Paste Gemini API Key here"
+                        android:textColorHint="@color/zinc_400"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:paddingHorizontal="10dp"
+                        android:inputType="textPassword" />
+
+                    <Button
+                        android:id="@+id/btnSaveGeminiKey"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Save"
+                        android:textSize="12sp"
+                        android:layout_marginStart="8dp"
+                        app:backgroundTint="#FF6366F1" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvGetGeminiKey"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👉 Get 100% Free Key from: aistudio.google.com"
+                    android:textColor="#FF34D399"
+                    android:textSize="11sp"
+                    android:layout_marginTop="6dp" />
             </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-            <Button
-                android:id="@+id/btnGrantOverlay"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Enable"
-                android:textSize="12sp"
-                app:backgroundTint="@color/indigo_500" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- Permission 2: Accessibility Service -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardAccessibilityPerm"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        app:cardBackgroundColor="@color/card_dark"
-        app:cardCornerRadius="14dp"
-        app:strokeColor="@color/zinc_700"
-        app:strokeWidth="1dp"
-        app:layout_constraintTop_toBottomOf="@id/cardOverlayPerm">
-
-        <LinearLayout
+        <!-- Test Assistant Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTestZara"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="14dp">
+            android:layout_height="56dp"
+            android:text="🚀 Test Siri Overlay Now"
+            android:textColor="@color/white"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:cornerRadius="16dp"
+            app:backgroundTint="@color/indigo_500"
+            android:layout_marginTop="22dp"
+            android:layout_marginBottom="30dp" />
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="2. Accessibility Automation"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Auto-types messages inside WhatsApp and clicks buttons"
-                    android:textColor="@color/zinc_400"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/btnGrantAccessibility"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Enable"
-                android:textSize="12sp"
-                app:backgroundTint="@color/pink_500" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- Test Assistant Button -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnTestZara"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="🚀 Test Floating Zara Now"
-        android:textColor="@color/white"
-        android:textSize="15sp"
-        android:textStyle="bold"
-        app:cornerRadius="16dp"
-        app:backgroundTint="@color/indigo_500"
-        android:layout_marginTop="28dp"
-        app:layout_constraintTop_toBottomOf="@id/cardAccessibilityPerm" />
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
+</ScrollView>
