@@ -70,7 +70,7 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_AUTO_SPEAK, value).apply()
 
     val isApiKeyConfigured: Boolean
-        get() = geminiApiKey.isNotBlank()
+        get() = geminiApiKey.isNotBlank() || true // Always ready via Cloud AI Backend or Custom Key
 
     companion object {
         private const val TAG = "PreferencesManager"

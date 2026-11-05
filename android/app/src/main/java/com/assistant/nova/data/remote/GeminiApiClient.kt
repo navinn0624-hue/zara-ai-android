@@ -31,49 +31,95 @@ class GeminiApiClient(
         memories: List<Pair<String, String>> = emptyList()
     ): GeminiResponse = withContext(Dispatchers.IO) {
         val apiKey = preferencesManager.geminiApiKey
-        if (apiKey.isBlank()) {
-            return@withContext GeminiResponse(
-                replyText = "Please configure your Gemini API Key in Settings to enable AI responses.",
-                isSuccess = false,
-                errorMessage = "API key not configured"
-            )
+
+        // 1. If user provided their own Gemini API key, use direct Google Gemini 1.5 Flash endpoint
+        if (apiKey.isNotBlank()) {
+            try {
+                val url = "$BASE_URL/models/$MODEL_NAME:generateContent?key=$apiKey"
+                val requestJson = buildRequestBody(userPrompt, recentHistory, memories)
+
+                val request = Request.Builder()
+                    .url(url)
+                    .post(requestJson.toString().toRequestBody(jsonMediaType))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        Log.e(TAG, "Gemini API error ${response.code}: $body")
+                        val parsedError = try {
+                            JSONObject(body).optJSONObject("error")?.optString("message") ?: "Error ${response.code}"
+                        } catch (e: Exception) {
+                            "HTTP ${response.code}: ${response.message}"
+                        }
+                        // Fallback to cloud backend if custom key quota fails
+                        Log.i(TAG, "Falling back to Cloud AI Backend due to error: $parsedError")
+                        return@withContext queryCloudBackendFallback(userPrompt)
+                    }
+
+                    return@withContext parseGeminiResponse(body)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Direct Gemini call failed, falling back to Cloud AI Backend", e)
+                return@withContext queryCloudBackendFallback(userPrompt)
+            }
         }
 
+        // 2. Default: Automatic Cloud AI Backend (No API key required by user!)
+        return@withContext queryCloudBackendFallback(userPrompt)
+    }
+
+    private fun queryCloudBackendFallback(userPrompt: String): GeminiResponse {
         try {
-            val url = "$BASE_URL/models/$MODEL_NAME:generateContent?key=$apiKey"
-            val requestJson = buildRequestBody(userPrompt, recentHistory, memories)
+            val reqJson = JSONObject().apply {
+                put("message", userPrompt)
+            }
 
             val request = Request.Builder()
-                .url(url)
-                .post(requestJson.toString().toRequestBody(jsonMediaType))
+                .url(CLOUD_BACKEND_URL)
+                .post(reqJson.toString().toRequestBody(jsonMediaType))
                 .build()
 
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    Log.e(TAG, "Gemini API error ${response.code}: $body")
-                    val parsedError = try {
-                        JSONObject(body).optJSONObject("error")?.optString("message") ?: "Error ${response.code}"
-                    } catch (e: Exception) {
-                        "HTTP ${response.code}: ${response.message}"
+                if (response.isSuccessful && body.isNotBlank()) {
+                    val json = JSONObject(body)
+                    val reply = when {
+                        json.has("tamil_reply") && json.getString("tamil_reply").isNotBlank() -> json.getString("tamil_reply")
+                        json.has("reply") -> json.getString("reply")
+                        json.has("voice_response") -> json.getString("voice_response")
+                        else -> "வணக்கம்! என்ன செய்ய வேண்டும்?"
                     }
-                    return@withContext GeminiResponse(
-                        replyText = "Sorry, I encountered an issue contacting the AI service: $parsedError",
-                        isSuccess = false,
-                        errorMessage = parsedError
+
+                    var detectedAction: AgentAction? = null
+                    if (json.has("action") && !json.isNull("action")) {
+                        val act = json.getJSONObject("action")
+                        val actType = act.optString("type")
+                        val actTarget = act.optString("target")
+                        when (actType.lowercase()) {
+                            "launch_app" -> detectedAction = AgentAction.LaunchApp(actTarget)
+                            "call" -> detectedAction = AgentAction.PrepareCall(actTarget, act.optString("phone", ""))
+                            "alarm" -> detectedAction = AgentAction.SetAlarm(act.optInt("hour", 7), act.optInt("minute", 0))
+                        }
+                    }
+
+                    return GeminiResponse(
+                        replyText = reply,
+                        detectedAction = detectedAction,
+                        isSuccess = true
                     )
                 }
-
-                parseGeminiResponse(body)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Network or parsing exception during Gemini call", e)
-            GeminiResponse(
-                replyText = "Network connection failed. Please check your internet connection.",
-                isSuccess = false,
-                errorMessage = e.localizedMessage
-            )
+            Log.e(TAG, "Cloud AI Backend call error", e)
         }
+
+        // 3. Built-in smart conversational offline fallback
+        return GeminiResponse(
+            replyText = "மன்னிக்கவும், இணைய இணைப்பு கிடைக்கவில்லை. தயவுசெய்து இன்டர்நெட் இணைப்பைச் சரிபார்க்கவும்.",
+            isSuccess = false,
+            errorMessage = "Connection timeout"
+        )
     }
 
     private fun buildRequestBody(
@@ -83,7 +129,6 @@ class GeminiApiClient(
     ): JSONObject {
         val root = JSONObject()
 
-        // 1. System Instruction
         val systemInstruction = JSONObject()
         val systemParts = JSONArray()
         val memoryContext = if (memories.isNotEmpty()) {
@@ -117,10 +162,8 @@ class GeminiApiClient(
         systemInstruction.put("parts", systemParts)
         root.put("system_instruction", systemInstruction)
 
-        // 2. Tools declaration
         root.put("tools", buildToolsDeclaration())
 
-        // 3. Contents (Conversation history + current turn)
         val contents = JSONArray()
         for ((role, text) in recentHistory.takeLast(6)) {
             val contentObj = JSONObject()
@@ -131,7 +174,6 @@ class GeminiApiClient(
             contents.put(contentObj)
         }
 
-        // Current message
         val currentContent = JSONObject()
         currentContent.put("role", "user")
         val currentParts = JSONArray()
@@ -141,7 +183,6 @@ class GeminiApiClient(
 
         root.put("contents", contents)
 
-        // 4. Generation Config
         val genConfig = JSONObject()
         genConfig.put("temperature", 0.6)
         genConfig.put("maxOutputTokens", 512)
@@ -280,7 +321,6 @@ class GeminiApiClient(
             }
         }
 
-        // If function was called and no text reply was generated, provide a standard descriptive reply
         if (textReply.isBlank() && agentAction != null) {
             textReply = when (agentAction) {
                 is AgentAction.LaunchApp -> "Opening ${agentAction.appName}..."
@@ -354,5 +394,6 @@ class GeminiApiClient(
         private const val TAG = "GeminiApiClient"
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
         private const val MODEL_NAME = "gemini-1.5-flash"
+        private const val CLOUD_BACKEND_URL = "https://zara-ai-assistant-gamma.vercel.app/api/chat"
     }
 }
