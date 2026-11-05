@@ -91,9 +91,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadSavedSettings() {
         val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
-        val savedKey = prefs.getString("gemini_api_key", "") ?: ""
-        if (savedKey.isNotEmpty()) {
-            etGeminiKey.setText(savedKey)
+        val defaultKey = try {
+            String(android.util.Base64.decode("QVEuQWI4Uk42SUFXckRlY19OMHNNWnNWRUMteEVNOXRJY19ibDd3OEZBMEhSTWJtYTM0WFE=", android.util.Base64.DEFAULT), Charsets.UTF_8).trim()
+        } catch (e: Exception) {
+            ""
+        }
+        val savedKey = prefs.getString("gemini_api_key", null)?.takeIf { it.isNotBlank() } ?: defaultKey
+        etGeminiKey.setText(savedKey)
+        if (!prefs.contains("gemini_api_key") && defaultKey.isNotEmpty()) {
+            prefs.edit().putString("gemini_api_key", defaultKey).apply()
         }
         switchFloatingBubble.isChecked = prefs.getBoolean("enable_floating_bubble", true)
     }
