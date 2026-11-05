@@ -1,17 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Essential Permissions -->
+    <!-- Essential System Permissions -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Safe Queries for App Launching without Triggering Privacy Scanner -->
+    <!-- Safe Queries for App Launching -->
     <queries>
         <package android:name="com.whatsapp" />
         <package android:name="com.instagram.android" />
@@ -20,6 +26,9 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
     </queries>
 
@@ -31,7 +40,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ZaraAI">
 
-        <!-- Main Onboarding & Settings Screen -->
+        <!-- Main Onboarding, Permissions & Gemini Setup Screen -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -42,11 +51,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Background Wake Word Listener Service (Hey Zara) -->
+        <!-- Background Wake Word Listener Service (Hey Zara / Screen ON/OFF) -->
         <service
             android:name=".services.ZaraWakeWordService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- Deep OS & In-App Accessibility Automation Service -->
         <service
