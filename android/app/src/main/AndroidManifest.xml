@@ -16,6 +16,7 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Safe Queries for App Launching -->
     <queries>
@@ -40,7 +41,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ZaraAI">
 
-        <!-- Main Onboarding, Permissions & Gemini Setup Screen -->
+        <!-- Main Onboarding & Controller Screen -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -48,6 +49,11 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Native Android Assistant Integration (Long press Power/Home) -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -57,6 +63,12 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- Floating Assistive Siri Bubble Service -->
+        <service
+            android:name=".services.FloatingBubbleService"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- Deep OS & In-App Accessibility Automation Service -->
         <service
