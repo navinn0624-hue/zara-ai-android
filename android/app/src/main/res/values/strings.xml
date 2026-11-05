@@ -1,11 +1,6 @@
 <resources>
-    <string name="app_name">NOVA Assistant</string>
-    <string name="wake_word">Hey NOVA</string>
-    <string name="listening">Listening…</string>
-    <string name="thinking">Thinking…</string>
-    <string name="speaking">Speaking…</string>
-    <string name="idle">Tap the orb or mic to talk</string>
-    <string name="permission_required_title">Microphone Permission Needed</string>
-    <string name="permission_required_desc">NOVA needs microphone access to listen to your voice commands and detect speech in Tamil and English.</string>
-    <string name="grant_permission">Grant Permission</string>
+    <string name="app_name">JARVIS AI</string>
+    <string name="accessibility_service_desc">JARVIS AI needs Accessibility Permission to automate in-app actions like opening WhatsApp, searching contacts, and typing messages hands-free.</string>
+    <string name="notification_channel_name">JARVIS AI Autonomous Brain</string>
+    <string name="notification_desc">Listening for Jarvis wake word in background</string>
 </resources>
