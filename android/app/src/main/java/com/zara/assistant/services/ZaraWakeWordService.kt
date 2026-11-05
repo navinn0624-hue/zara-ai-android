@@ -16,6 +16,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.zara.assistant.MainActivity
+import com.zara.assistant.R
 import com.zara.assistant.overlay.FloatingOverlayManager
 import kotlinx.coroutines.*
 
@@ -115,23 +116,21 @@ class ZaraWakeWordService : Service() {
                 while (isListening && isActive) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0) {
-                        // Calculate volume amplitude (RMS)
                         var sum = 0.0
                         for (i in 0 until read) {
                             sum += buffer[i] * buffer[i]
                         }
                         val rms = Math.sqrt(sum / read)
 
-                        // Threshold for voice call "Zara"
-                        if (rms > 2800) {
+                        // Voice threshold for "Hey Zara"
+                        if (rms > 2500) {
                             speechFrames++
-                            // When sustained voice is detected, wake screen and trigger Zara!
-                            if (speechFrames >= 3) {
+                            if (speechFrames >= 2) {
                                 speechFrames = 0
                                 withContext(Dispatchers.Main) {
                                     wakeScreenAndShowOverlay()
                                 }
-                                delay(3000) // Cooldown after activation
+                                delay(3500) // Cooldown after activation
                             }
                         } else {
                             if (speechFrames > 0) speechFrames--
@@ -164,10 +163,12 @@ class ZaraWakeWordService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         @Suppress("DEPRECATION")
         val screenWakeLock = powerManager.newWakeLock(
-            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+            PowerManager.ACQUIRE_CAUSES_WAKEUP or
+            PowerManager.ON_AFTER_RELEASE,
             "ZaraAI:WakeScreen"
         )
-        screenWakeLock.acquire(3000)
+        screenWakeLock.acquire(4000)
 
         FloatingOverlayManager.show(applicationContext)
     }
@@ -203,10 +204,10 @@ class ZaraWakeWordService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Zara AI is Active 🎙️")
-            .setContentText("Say 'Zara' anytime to activate (Screen ON/OFF)")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentText("Say 'Zara' anytime or tap to speak (Screen ON/OFF)")
+            .setSmallIcon(R.drawable.ic_launcher_zara)
             .setContentIntent(pendingTapIntent)
-            .addAction(android.R.drawable.ic_btn_speak_now, "Wake Zara ✨", pendingTriggerIntent)
+            .addAction(R.drawable.ic_launcher_zara, "Wake Zara ✨", pendingTriggerIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
