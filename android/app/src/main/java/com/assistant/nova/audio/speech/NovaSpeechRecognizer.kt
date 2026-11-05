@@ -66,9 +66,9 @@ class NovaSpeechRecognizer(private val context: Context) {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
                 }
                 LanguagePreference.AUTO -> {
-                    // Default to English, with Tamil as extra supported language
+                    // Default to device locale, with Tamil and English as additional languages
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-                    putExtra(RecognizerIntent.EXTRA_ADDITIONAL_LANGUAGES, arrayOf("ta-IN", "en-IN", "en-US"))
+                    putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("ta-IN", "en-IN", "en-US"))
                 }
             }
         }
