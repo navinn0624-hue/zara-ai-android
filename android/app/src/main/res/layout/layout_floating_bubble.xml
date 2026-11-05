@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/frameBubbleRoot"
+    android:layout_width="54dp"
+    android:layout_height="54dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Outer Ambient Glow -->
+    <View
+        android:layout_width="54dp"
+        android:layout_height="54dp"
+        android:layout_gravity="center"
+        android:background="@drawable/siri_glow_outer" />
+
+    <!-- Radiant Middle Pulse -->
+    <View
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="center"
+        android:background="@drawable/siri_glow_middle" />
+
+    <!-- Core Orb -->
+    <View
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="center"
+        android:background="@drawable/siri_glow_core" />
+
+</FrameLayout>
