@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var btnGrantOverlay: Button
     private lateinit var btnGrantAccessibility: Button
+    private lateinit var btnGrantMic: Button
     private lateinit var btnTestZara: Button
     private lateinit var tvServiceStatus: TextView
     private lateinit var etGeminiKey: EditText
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         btnGrantOverlay = findViewById(R.id.btnGrantOverlay)
         btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility)
+        btnGrantMic = findViewById(R.id.btnGrantMic)
         btnTestZara = findViewById(R.id.btnTestZara)
         tvServiceStatus = findViewById(R.id.tvServiceStatus)
         etGeminiKey = findViewById(R.id.etGeminiKey)
@@ -79,6 +81,10 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Find 'Zara AI' and turn it ON", Toast.LENGTH_LONG).show()
         }
 
+        btnGrantMic.setOnClickListener {
+            requestMicrophonePermission()
+        }
+
         btnSaveGeminiKey.setOnClickListener {
             val key = etGeminiKey.text.toString().trim()
             val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
@@ -103,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private fun updatePermissionStatus() {
         val hasOverlay = hasOverlayPermission()
         val hasAccessibility = isAccessibilityServiceEnabled(this, ZaraAccessibilityService::class.java)
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
         if (hasOverlay) {
             btnGrantOverlay.text = "✓ Enabled"
@@ -120,10 +127,18 @@ class MainActivity : AppCompatActivity() {
             btnGrantAccessibility.isEnabled = true
         }
 
-        if (hasOverlay && hasAccessibility) {
+        if (hasMic) {
+            btnGrantMic.text = "✓ Enabled"
+            btnGrantMic.isEnabled = false
+        } else {
+            btnGrantMic.text = "Enable"
+            btnGrantMic.isEnabled = true
+        }
+
+        if (hasOverlay && hasAccessibility && hasMic) {
             tvServiceStatus.text = "Status: Zara Active 24/7! (Screen ON/OFF)"
         } else {
-            tvServiceStatus.text = "Status: Waiting for permissions..."
+            tvServiceStatus.text = "Status: Please enable all permissions above!"
         }
     }
 
@@ -159,6 +174,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        updatePermissionStatus()
+        startBackgroundWakeServiceIfPermitted()
+    }
+
     private fun requestBatteryOptimizationExemption() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -178,10 +199,14 @@ class MainActivity : AppCompatActivity() {
     private fun startBackgroundWakeServiceIfPermitted() {
         if (hasOverlayPermission() && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             val serviceIntent = Intent(this, ZaraWakeWordService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent)
+                } else {
+                    startService(serviceIntent)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
