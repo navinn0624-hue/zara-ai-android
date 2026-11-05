@@ -1,6 +1,9 @@
 package com.zara.assistant
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +12,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -16,7 +21,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.zara.assistant.overlay.FloatingOverlayManager
+import com.zara.assistant.services.FloatingBubbleService
 import com.zara.assistant.services.ZaraAccessibilityService
 import com.zara.assistant.services.ZaraWakeWordService
 
@@ -25,11 +32,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnGrantOverlay: Button
     private lateinit var btnGrantAccessibility: Button
     private lateinit var btnGrantMic: Button
-    private lateinit var btnTestZara: Button
-    private lateinit var tvServiceStatus: TextView
+    private lateinit var btnLaunchSiri: Button
+    private lateinit var switchFloatingBubble: SwitchMaterial
     private lateinit var etGeminiKey: EditText
     private lateinit var btnSaveGeminiKey: Button
     private lateinit var tvGetGeminiKey: TextView
+    private lateinit var heroSiriOrbContainer: View
+    private lateinit var tvHeaderLiveStatus: TextView
+
+    private var heroPulseAnimator: ObjectAnimator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,13 +49,16 @@ class MainActivity : AppCompatActivity() {
         btnGrantOverlay = findViewById(R.id.btnGrantOverlay)
         btnGrantAccessibility = findViewById(R.id.btnGrantAccessibility)
         btnGrantMic = findViewById(R.id.btnGrantMic)
-        btnTestZara = findViewById(R.id.btnTestZara)
-        tvServiceStatus = findViewById(R.id.tvServiceStatus)
+        btnLaunchSiri = findViewById(R.id.btnLaunchSiri)
+        switchFloatingBubble = findViewById(R.id.switchFloatingBubble)
         etGeminiKey = findViewById(R.id.etGeminiKey)
         btnSaveGeminiKey = findViewById(R.id.btnSaveGeminiKey)
         tvGetGeminiKey = findViewById(R.id.tvGetGeminiKey)
+        heroSiriOrbContainer = findViewById(R.id.heroSiriOrbContainer)
+        tvHeaderLiveStatus = findViewById(R.id.tvHeaderLiveStatus)
 
-        loadSavedGeminiKey()
+        loadSavedSettings()
+        startHeroOrbAnimation()
         requestMicrophonePermission()
         requestBatteryOptimizationExemption()
         setupListeners()
@@ -54,17 +68,46 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePermissionStatus()
         startBackgroundWakeServiceIfPermitted()
+        manageFloatingBubbleService()
     }
 
-    private fun loadSavedGeminiKey() {
+    override fun onDestroy() {
+        super.onDestroy()
+        heroPulseAnimator?.cancel()
+    }
+
+    private fun startHeroOrbAnimation() {
+        val midRing = findViewById<View>(R.id.heroGlowMiddle)
+        val scaleX = PropertyValuesHolder.ofFloat(View.SCALE_X, 0.94f, 1.12f)
+        val scaleY = PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.94f, 1.12f)
+        heroPulseAnimator = ObjectAnimator.ofPropertyValuesHolder(midRing, scaleX, scaleY).apply {
+            duration = 1500
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    private fun loadSavedSettings() {
         val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
         val savedKey = prefs.getString("gemini_api_key", "") ?: ""
         if (savedKey.isNotEmpty()) {
             etGeminiKey.setText(savedKey)
         }
+        switchFloatingBubble.isChecked = prefs.getBoolean("enable_floating_bubble", true)
     }
 
     private fun setupListeners() {
+        // Tapping the Centerpiece Orb activates Siri immediately
+        heroSiriOrbContainer.setOnClickListener {
+            triggerSiriOverlay()
+        }
+
+        btnLaunchSiri.setOnClickListener {
+            triggerSiriOverlay()
+        }
+
         btnGrantOverlay.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val intent = Intent(
@@ -78,11 +121,17 @@ class MainActivity : AppCompatActivity() {
         btnGrantAccessibility.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
-            Toast.makeText(this, "Find 'Zara AI' and turn it ON", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Find 'Zara AI' and switch it ON", Toast.LENGTH_LONG).show()
         }
 
         btnGrantMic.setOnClickListener {
             requestMicrophonePermission()
+        }
+
+        switchFloatingBubble.setOnCheckedChangeListener { _, isChecked ->
+            val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("enable_floating_bubble", isChecked).apply()
+            manageFloatingBubbleService()
         }
 
         btnSaveGeminiKey.setOnClickListener {
@@ -96,14 +145,14 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
             startActivity(intent)
         }
+    }
 
-        btnTestZara.setOnClickListener {
-            if (!hasOverlayPermission()) {
-                Toast.makeText(this, "Please enable 'Display Over Other Apps' first!", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            FloatingOverlayManager.show(this)
+    private fun triggerSiriOverlay() {
+        if (!hasOverlayPermission()) {
+            Toast.makeText(this, "Please enable 'Siri Floating Display' first!", Toast.LENGTH_SHORT).show()
+            return
         }
+        FloatingOverlayManager.show(this)
     }
 
     private fun updatePermissionStatus() {
@@ -112,33 +161,41 @@ class MainActivity : AppCompatActivity() {
         val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
         if (hasOverlay) {
-            btnGrantOverlay.text = "✓ Enabled"
+            btnGrantOverlay.text = "Active ✓"
             btnGrantOverlay.isEnabled = false
+            btnGrantOverlay.alpha = 0.6f
         } else {
             btnGrantOverlay.text = "Enable"
             btnGrantOverlay.isEnabled = true
+            btnGrantOverlay.alpha = 1.0f
         }
 
         if (hasAccessibility) {
-            btnGrantAccessibility.text = "✓ Enabled"
+            btnGrantAccessibility.text = "Active ✓"
             btnGrantAccessibility.isEnabled = false
+            btnGrantAccessibility.alpha = 0.6f
         } else {
             btnGrantAccessibility.text = "Enable"
             btnGrantAccessibility.isEnabled = true
+            btnGrantAccessibility.alpha = 1.0f
         }
 
         if (hasMic) {
-            btnGrantMic.text = "✓ Enabled"
+            btnGrantMic.text = "Active ✓"
             btnGrantMic.isEnabled = false
+            btnGrantMic.alpha = 0.6f
         } else {
             btnGrantMic.text = "Enable"
             btnGrantMic.isEnabled = true
+            btnGrantMic.alpha = 1.0f
         }
 
         if (hasOverlay && hasAccessibility && hasMic) {
-            tvServiceStatus.text = "Status: Zara Active 24/7! (Screen ON/OFF)"
+            tvHeaderLiveStatus.text = "ONLINE"
+            tvHeaderLiveStatus.setTextColor(ContextCompat.getColor(this, R.color.emerald_400))
         } else {
-            tvServiceStatus.text = "Status: Please enable all permissions above!"
+            tvHeaderLiveStatus.text = "SETUP"
+            tvHeaderLiveStatus.setTextColor(ContextCompat.getColor(this, R.color.zinc_400))
         }
     }
 
@@ -178,6 +235,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         updatePermissionStatus()
         startBackgroundWakeServiceIfPermitted()
+        manageFloatingBubbleService()
     }
 
     private fun requestBatteryOptimizationExemption() {
@@ -205,6 +263,26 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     startService(serviceIntent)
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun manageFloatingBubbleService() {
+        val prefs = getSharedPreferences("zara_prefs", Context.MODE_PRIVATE)
+        val enabled = prefs.getBoolean("enable_floating_bubble", true)
+        val bubbleIntent = Intent(this, FloatingBubbleService::class.java)
+
+        if (enabled && hasOverlayPermission()) {
+            try {
+                startService(bubbleIntent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        } else {
+            try {
+                stopService(bubbleIntent)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
