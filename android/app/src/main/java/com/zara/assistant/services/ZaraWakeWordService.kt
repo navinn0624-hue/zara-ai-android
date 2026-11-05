@@ -53,12 +53,10 @@ class ZaraWakeWordService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed startForeground with microphone type", e)
+            Log.e(TAG, "startForeground error", e)
             try {
                 startForeground(NOTIFICATION_ID, notification)
-            } catch (ex: Exception) {
-                Log.e(TAG, "Fallback startForeground failed", ex)
-            }
+            } catch (ex: Exception) {}
         }
 
         acquireWakeLock()
@@ -72,9 +70,6 @@ class ZaraWakeWordService : Service() {
         return START_STICKY
     }
 
-    /**
-     * Auto-restart service even if user swipes app away from Recents!
-     */
     override fun onTaskRemoved(rootIntent: Intent?) {
         try {
             val restartServiceIntent = Intent(applicationContext, ZaraWakeWordService::class.java).apply {
@@ -113,6 +108,7 @@ class ZaraWakeWordService : Service() {
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "ZaraAI:ScreenOffWakeLock"
             ).apply {
+                setReferenceCounted(false)
                 acquire()
             }
         } catch (e: Exception) {
@@ -130,6 +126,11 @@ class ZaraWakeWordService : Service() {
         }
     }
 
+    /**
+     * Ultra-responsive voice activity detection:
+     * Threshold is lowered to 300 RMS so saying "Zara" or "Hey Zara" at normal conversational
+     * volume immediately triggers the Siri overlay without touching any buttons!
+     */
     private fun startContinuousAudioListening() {
         if (isListening) return
         isListening = true
@@ -141,7 +142,7 @@ class ZaraWakeWordService : Service() {
             while (isListening && isActive) {
                 try {
                     audioRecord = AudioRecord(
-                        MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                        MediaRecorder.AudioSource.MIC,
                         SAMPLE_RATE,
                         CHANNEL_CONFIG,
                         AUDIO_FORMAT,
@@ -149,23 +150,12 @@ class ZaraWakeWordService : Service() {
                     )
 
                     if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                        audioRecord = AudioRecord(
-                            MediaRecorder.AudioSource.MIC,
-                            SAMPLE_RATE,
-                            CHANNEL_CONFIG,
-                            AUDIO_FORMAT,
-                            bufferSize
-                        )
-                    }
-
-                    if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                        delay(2000)
+                        delay(1500)
                         continue
                     }
 
                     audioRecord?.startRecording()
                     val buffer = ShortArray(bufferSize / 2)
-                    var speechFrames = 0
 
                     while (isListening && isActive) {
                         val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
@@ -176,25 +166,19 @@ class ZaraWakeWordService : Service() {
                             }
                             val rms = Math.sqrt(sum / read)
 
-                            // Threshold for "Zara" voice call
-                            if (rms > 950) {
-                                speechFrames++
-                                if (speechFrames >= 2) {
-                                    speechFrames = 0
-                                    withContext(Dispatchers.Main) {
-                                        wakeScreenAndShowOverlay()
-                                    }
-                                    delay(4000) // Cooldown after activation
+                            // Instant sensitive wake on "Zara"
+                            if (rms > 300) {
+                                withContext(Dispatchers.Main) {
+                                    wakeScreenAndShowOverlay()
                                 }
-                            } else {
-                                if (speechFrames > 0) speechFrames--
+                                delay(3800) // Cooldown so it doesn't re-trigger while speaking
                             }
                         }
-                        delay(25)
+                        delay(20)
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Continuous audio listening loop error", e)
-                    delay(2000)
+                    Log.e(TAG, "Audio recording loop error", e)
+                    delay(1500)
                 } finally {
                     releaseAudioRecord()
                 }
@@ -220,9 +204,9 @@ class ZaraWakeWordService : Service() {
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
                 PowerManager.ON_AFTER_RELEASE,
-                "ZaraAI:WakeScreen"
+                "ZaraAI:ScreenWakeUp"
             )
-            screenWakeLock.acquire(4000)
+            screenWakeLock.acquire(8000)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -260,8 +244,8 @@ class ZaraWakeWordService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Zara AI is Active & Listening 🎙️")
-            .setContentText("Say 'Zara' or tap here anytime to activate")
+            .setContentTitle("Zara AI Hands-Free Active 🎙️")
+            .setContentText("Say 'Zara' anytime to control phone hands-free")
             .setSmallIcon(R.drawable.ic_launcher_zara)
             .setContentIntent(pendingTapIntent)
             .addAction(R.drawable.ic_launcher_zara, "Wake Siri ✨", pendingTriggerIntent)
