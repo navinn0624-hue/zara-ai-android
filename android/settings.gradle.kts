@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MyAssistantNova"
+rootProject.name = "ZaraAI"
 include(":app")
