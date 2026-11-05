@@ -12,25 +12,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assistant.nova.domain.model.ChatMessage
 import com.assistant.nova.domain.model.MessageSender
-import com.assistant.nova.ui.theme.DarkBorder
-import com.assistant.nova.ui.theme.DarkCard
-import com.assistant.nova.ui.theme.DarkSurface
-import com.assistant.nova.ui.theme.NeonCyan
-import com.assistant.nova.ui.theme.NeonPurple
-import com.assistant.nova.ui.theme.TextPrimary
-import com.assistant.nova.ui.theme.TextSecondary
-import com.assistant.nova.ui.theme.TextTertiary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,12 +41,17 @@ fun ChatBubble(
     }
 
     val bubbleBackground = if (isUser) {
-        DarkCard
+        MaterialTheme.colorScheme.surfaceVariant
     } else {
-        DarkSurface
+        MaterialTheme.colorScheme.surface
     }
 
-    val borderColor = if (isUser) NeonPurple.copy(alpha = 0.35f) else NeonCyan.copy(alpha = 0.35f)
+    val borderColor = if (isUser) {
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+    }
+
     val timeFormatter = SimpleDateFormat("h:mm a", Locale.getDefault())
     val formattedTime = timeFormatter.format(Date(message.timestamp))
 
@@ -84,7 +81,7 @@ fun ChatBubble(
                 ) {
                     Text(
                         text = if (isUser) "You" else "NOVA",
-                        color = if (isUser) NeonPurple else NeonCyan,
+                        color = if (isUser) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -93,12 +90,12 @@ fun ChatBubble(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(DarkBorder)
+                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = languageBadge,
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -108,7 +105,7 @@ fun ChatBubble(
 
                         Text(
                             text = formattedTime,
-                            color = TextTertiary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 10.sp
                         )
                     }
@@ -118,7 +115,7 @@ fun ChatBubble(
 
                 Text(
                     text = message.content,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     lineHeight = 22.sp
                 )

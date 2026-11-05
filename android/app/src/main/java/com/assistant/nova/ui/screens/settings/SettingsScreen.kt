@@ -1,5 +1,8 @@
 package com.assistant.nova.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,13 +22,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
@@ -41,6 +46,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
@@ -69,18 +76,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assistant.nova.NovaApplication
 import com.assistant.nova.domain.model.LanguagePreference
+import com.assistant.nova.domain.model.ThemeMode
 import com.assistant.nova.ui.NovaViewModel
-import com.assistant.nova.ui.theme.DarkBorder
-import com.assistant.nova.ui.theme.DarkCard
-import com.assistant.nova.ui.theme.DarkSurface
-import com.assistant.nova.ui.theme.DarkVoid
-import com.assistant.nova.ui.theme.NeonCyan
 import com.assistant.nova.ui.theme.NeonGreen
-import com.assistant.nova.ui.theme.NeonPurple
 import com.assistant.nova.ui.theme.NeonRed
-import com.assistant.nova.ui.theme.TextPrimary
-import com.assistant.nova.ui.theme.TextSecondary
-import com.assistant.nova.ui.theme.TextTertiary
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,10 +93,13 @@ fun SettingsScreen(
     val prefs = app.preferencesManager
     val scope = rememberCoroutineScope()
 
+    val currentTheme by viewModel.themeMode.collectAsState()
+    val isHandsFree by viewModel.isHandsFreeEnabled.collectAsState()
+    val isBackgroundListening by viewModel.isBackgroundListening.collectAsState()
+
     var apiKey by remember { mutableStateOf(prefs.geminiApiKey) }
     var isApiKeyVisible by remember { mutableStateOf(false) }
     var selectedLanguage by remember { mutableStateOf(prefs.languagePreference) }
-    var wakeWordEnabled by remember { mutableStateOf(prefs.wakeWordEnabled) }
     var speechRate by remember { mutableFloatStateOf(prefs.ttsSpeechRate) }
     var speechPitch by remember { mutableFloatStateOf(prefs.ttsPitch) }
 
@@ -106,7 +108,7 @@ fun SettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkVoid)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -122,7 +124,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = TextPrimary
+                        tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
@@ -130,7 +132,7 @@ fun SettingsScreen(
 
                 Text(
                     text = "NOVA Settings",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -142,15 +144,164 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Section 1: Security & Gemini API Key
+                // Section 1: Appearance & Theme (Light / Dark)
+                item {
+                    SettingsCard(
+                        title = "Appearance & Theme",
+                        icon = Icons.Default.DarkMode
+                    ) {
+                        Text(
+                            text = "Switch between Clean Arctic Light mode and Futuristic OLED Dark mode.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        ThemeMode.entries.forEach { mode ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        viewModel.setThemeMode(mode)
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            2.dp,
+                                            if (currentTheme == mode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                            CircleShape
+                                        )
+                                        .background(if (currentTheme == mode) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                )
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Text(
+                                    text = mode.displayName,
+                                    color = if (currentTheme == mode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (currentTheme == mode) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section 2: Always-On Background Wake Word ("Hey NOVA")
+                item {
+                    SettingsCard(
+                        title = "Always-On Background Wake Word",
+                        icon = Icons.Default.Hearing
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Listen when screen off or in other apps",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Whenever you say 'Hey NOVA', the phone wakes up and starts voice control.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            Switch(
+                                checked = isBackgroundListening,
+                                onCheckedChange = {
+                                    viewModel.setBackgroundListening(it)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Battery settings not accessible directly", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.BatteryAlert, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Disable Battery Optimization (Recommended)", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                // Section 3: Hands-Free Voice Control (No Touch)
+                item {
+                    SettingsCard(
+                        title = "Hands-Free Voice Control (No Touch)",
+                        icon = Icons.Default.Mic
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "No Touch Voice Confirmation",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "When calling someone or sending SMS, NOVA asks you via voice. Reply 'Yes' or 'No' without touching the screen.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            Switch(
+                                checked = isHandsFree,
+                                onCheckedChange = {
+                                    viewModel.setHandsFreeMode(it)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Section 4: Security & Gemini API Key
                 item {
                     SettingsCard(
                         title = "Gemini API Security",
                         icon = Icons.Default.Key
                     ) {
                         Text(
-                            text = "To keep your credentials private, your key is stored locally inside Android's Hardware Keystore (EncryptedSharedPreferences) and is never committed to GitHub.",
-                            color = TextSecondary,
+                            text = "Your API key is stored securely in the Android Hardware Keystore (EncryptedSharedPreferences).",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             lineHeight = 18.sp
                         )
@@ -160,7 +311,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = apiKey,
                             onValueChange = { apiKey = it },
-                            label = { Text("Gemini API Key", color = TextSecondary) },
+                            label = { Text("Gemini API Key", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             singleLine = true,
                             visualTransformation = if (isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIcon = {
@@ -168,16 +319,16 @@ fun SettingsScreen(
                                     Icon(
                                         imageVector = if (isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = "Toggle Visibility",
-                                        tint = TextSecondary
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NeonCyan,
-                                unfocusedBorderColor = DarkBorder,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
-                                cursorColor = NeonCyan
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                cursorColor = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -191,28 +342,28 @@ fun SettingsScreen(
                                 Toast.makeText(context, "API Key saved securely", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = NeonCyan,
-                                contentColor = DarkVoid
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.align(Alignment.End)
                         ) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = DarkVoid)
+                            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Save Key", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Section 2: Language & Bilingual Mode
+                // Section 5: Language & Bilingual Mode
                 item {
                     SettingsCard(
                         title = "Language & Code-Switching",
                         icon = Icons.Default.Language
                     ) {
                         Text(
-                            text = "NOVA detects whether you are speaking pure Tamil, English, or conversational Tanglish ('alarm vai 7 am ku').",
-                            color = TextSecondary,
+                            text = "NOVA detects whether you are speaking Tamil, English, or conversational Tanglish ('alarm vai 7 am ku').",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp
                         )
 
@@ -236,17 +387,17 @@ fun SettingsScreen(
                                         .clip(CircleShape)
                                         .border(
                                             2.dp,
-                                            if (selectedLanguage == lang) NeonCyan else DarkBorder,
+                                            if (selectedLanguage == lang) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                             CircleShape
                                         )
-                                        .background(if (selectedLanguage == lang) NeonCyan else Color.Transparent)
+                                        .background(if (selectedLanguage == lang) MaterialTheme.colorScheme.primary else Color.Transparent)
                                 )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
                                 Text(
                                     text = lang.displayName,
-                                    color = if (selectedLanguage == lang) NeonCyan else TextPrimary,
+                                    color = if (selectedLanguage == lang) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                     fontSize = 14.sp,
                                     fontWeight = if (selectedLanguage == lang) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -255,64 +406,13 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section 3: Wake Word ("Hey NOVA")
-                item {
-                    SettingsCard(
-                        title = "Wake Word ('Hey NOVA')",
-                        icon = Icons.Default.Mic
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Enable 'Hey NOVA' Activation",
-                                    color = TextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Listens for voice trigger when assistant is active or in foreground.",
-                                    color = TextSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-
-                            Switch(
-                                checked = wakeWordEnabled,
-                                onCheckedChange = {
-                                    wakeWordEnabled = it
-                                    prefs.wakeWordEnabled = it
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = DarkVoid,
-                                    checkedTrackColor = NeonCyan,
-                                    uncheckedThumbColor = TextSecondary,
-                                    uncheckedTrackColor = DarkSurface
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "Microphone privacy: In accordance with Android 12+ security guidelines, continuous listening requires foreground microphone permission and will display the OS privacy dot.",
-                            color = TextTertiary,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
-                    }
-                }
-
-                // Section 4: Voice & Speech Rate
+                // Section 6: Voice & Speech Rate
                 item {
                     SettingsCard(
                         title = "Voice Feedback & Pitch",
                         icon = Icons.Default.VolumeUp
                     ) {
-                        Text(text = "Speech Rate (${String.format("%.1fx", speechRate)})", color = TextPrimary, fontSize = 13.sp)
+                        Text(text = "Speech Rate (${String.format("%.1fx", speechRate)})", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
                         Slider(
                             value = speechRate,
                             onValueChange = {
@@ -321,15 +421,15 @@ fun SettingsScreen(
                             },
                             valueRange = 0.7f..1.5f,
                             colors = SliderDefaults.colors(
-                                thumbColor = NeonCyan,
-                                activeTrackColor = NeonCyan,
-                                inactiveTrackColor = DarkBorder
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                             )
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(text = "Voice Pitch (${String.format("%.1fx", speechPitch)})", color = TextPrimary, fontSize = 13.sp)
+                        Text(text = "Voice Pitch (${String.format("%.1fx", speechPitch)})", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
                         Slider(
                             value = speechPitch,
                             onValueChange = {
@@ -338,23 +438,23 @@ fun SettingsScreen(
                             },
                             valueRange = 0.7f..1.5f,
                             colors = SliderDefaults.colors(
-                                thumbColor = NeonPurple,
-                                activeTrackColor = NeonPurple,
-                                inactiveTrackColor = DarkBorder
+                                thumbColor = MaterialTheme.colorScheme.secondary,
+                                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                             )
                         )
                     }
                 }
 
-                // Section 5: Long-term Agent Memory
+                // Section 7: Long-term Agent Memory
                 item {
                     SettingsCard(
                         title = "Assistant Memory & Facts",
                         icon = Icons.Default.Psychology
                     ) {
                         Text(
-                            text = "NOVA remembers facts you've asked it to store (e.g. 'Remember my office is in Guindy'). You can view or delete memories at any time.",
-                            color = TextSecondary,
+                            text = "NOVA remembers facts you've asked it to store. You can review or delete memories at any time.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
 
@@ -363,7 +463,7 @@ fun SettingsScreen(
                         if (memories.isEmpty()) {
                             Text(
                                 text = "No persistent memories saved yet.",
-                                color = TextTertiary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 fontSize = 13.sp
                             )
                         } else {
@@ -376,8 +476,8 @@ fun SettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = memory.key, color = NeonCyan, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                        Text(text = memory.value, color = TextPrimary, fontSize = 12.sp)
+                                        Text(text = memory.key, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(text = memory.value, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                                     }
                                     IconButton(onClick = {
                                         scope.launch {
@@ -395,7 +495,10 @@ fun SettingsScreen(
                                 onClick = {
                                     scope.launch { app.manageMemoryUseCase.clearAll() }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = DarkBorder, contentColor = NeonRed),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = NeonRed
+                                ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Clear All Memories", fontSize = 12.sp)
@@ -404,23 +507,23 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section 6: Security & Permissions Disclosure
+                // Section 8: Privacy & Permissions
                 item {
                     SettingsCard(
                         title = "Privacy & Android Permissions",
                         icon = Icons.Default.Security
                     ) {
                         val permissions = listOf(
-                            "Microphone" to "Used exclusively for on-device voice recognition and keyword detection.",
-                            "Phone & Calls" to "Always requires interactive confirmation before placing any call.",
-                            "SMS & Messaging" to "Never sends messages silently without your explicit approval tap.",
-                            "Alarms & Timers" to "Used to set clock alarms via standard Android Intents."
+                            "Microphone (Always-On)" to "Listens for 'Hey NOVA' keyword in background foreground service.",
+                            "Phone & Calls" to "Voice confirmation allows calling contacts 100% hands-free.",
+                            "SMS & Messaging" to "Prepares messages with spoken verification.",
+                            "Alarms & Timers" to "Sets clock alarms and timers directly."
                         )
 
                         permissions.forEach { (perm, desc) ->
                             Column(modifier = Modifier.padding(vertical = 4.dp)) {
                                 Text(text = perm, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = desc, color = TextSecondary, fontSize = 12.sp)
+                                Text(text = desc, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                             }
                         }
                     }
@@ -443,16 +546,16 @@ private fun SettingsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, DarkBorder, RoundedCornerShape(16.dp)),
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = NeonCyan,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
 
@@ -460,7 +563,7 @@ private fun SettingsCard(
 
                 Text(
                     text = title,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )

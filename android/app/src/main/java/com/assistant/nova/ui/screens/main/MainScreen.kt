@@ -30,15 +30,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -58,24 +60,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.assistant.nova.ui.NovaUiState
+import com.assistant.nova.domain.model.ThemeMode
 import com.assistant.nova.ui.NovaViewModel
 import com.assistant.nova.ui.components.ActionApprovalCard
 import com.assistant.nova.ui.components.ChatBubble
 import com.assistant.nova.ui.components.NovaOrb
 import com.assistant.nova.ui.components.OrbState
 import com.assistant.nova.ui.components.VoiceWaveform
-import com.assistant.nova.ui.theme.DarkBorder
-import com.assistant.nova.ui.theme.DarkCard
-import com.assistant.nova.ui.theme.DarkSurface
-import com.assistant.nova.ui.theme.DarkVoid
-import com.assistant.nova.ui.theme.NeonCyan
 import com.assistant.nova.ui.theme.NeonGreen
 import com.assistant.nova.ui.theme.NeonMagenta
-import com.assistant.nova.ui.theme.NeonPurple
-import com.assistant.nova.ui.theme.TextPrimary
-import com.assistant.nova.ui.theme.TextSecondary
-import com.assistant.nova.ui.theme.TextTertiary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +77,7 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
     var typedText by remember { mutableStateOf("") }
     val chatListState = rememberLazyListState()
 
@@ -97,7 +91,7 @@ fun MainScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkVoid)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -106,9 +100,11 @@ fun MainScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Top Bar
+            // 1. Top Bar with 1-Tap Theme Toggle & Settings
             TopBar(
                 isApiKeySet = uiState.isApiKeySet,
+                themeMode = themeMode,
+                onToggleTheme = { viewModel.toggleThemeMode() },
                 onClearChat = { viewModel.clearHistory() },
                 onSettingsClick = onNavigateToSettings
             )
@@ -188,7 +184,7 @@ fun MainScreen(
 
                     Text(
                         text = if (uiState.liveTranscript.isNotBlank()) "\"${uiState.liveTranscript}\"" else uiState.statusMessage,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         maxLines = 2,
                         modifier = Modifier.weight(1f)
@@ -242,13 +238,15 @@ fun MainScreen(
 @Composable
 private fun TopBar(
     isApiKeySet: Boolean,
+    themeMode: ThemeMode,
+    onToggleTheme: () -> Unit,
     onClearChat: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -264,7 +262,7 @@ private fun TopBar(
 
             Text(
                 text = "NOVA",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.5.sp
@@ -275,32 +273,42 @@ private fun TopBar(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(DarkCard)
-                    .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = "HEY NOVA",
-                    color = NeonCyan,
+                    text = "ALWAYS-ON",
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
 
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Instant 1-tap Theme Switcher button
+            IconButton(onClick = onToggleTheme) {
+                Icon(
+                    imageVector = if (themeMode == ThemeMode.LIGHT) Icons.Default.DarkMode else Icons.Default.LightMode,
+                    contentDescription = "Toggle Light/Dark Theme",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
             IconButton(onClick = onClearChat) {
                 Icon(
                     imageVector = Icons.Default.DeleteSweep,
                     contentDescription = "Clear Chat",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
             IconButton(onClick = onSettingsClick) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "Settings",
-                    tint = TextPrimary
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
         }
@@ -312,13 +320,13 @@ private fun StatusPill(statusMessage: String, liveTranscript: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(DarkCard)
-            .border(1.dp, DarkBorder, RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
             .padding(horizontal = 18.dp, vertical = 8.dp)
     ) {
         Text(
             text = if (liveTranscript.isNotBlank()) "\"$liveTranscript\"" else statusMessage,
-            color = if (liveTranscript.isNotBlank()) NeonCyan else TextSecondary,
+            color = if (liveTranscript.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp,
             textAlign = TextAlign.Center
         )
@@ -344,14 +352,14 @@ private fun QuickActionRow(onActionSelected: (String) -> Unit) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
-                    .background(DarkCard)
-                    .border(1.dp, NeonPurple.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
                     .clickable { onActionSelected(command) }
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = label,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -379,8 +387,8 @@ private fun BottomControlBar(
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(24.dp))
-                .background(DarkSurface)
-                .border(1.dp, DarkBorder, RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
                 .padding(horizontal = 14.dp, vertical = 4.dp)
         ) {
             Row(
@@ -391,17 +399,17 @@ private fun BottomControlBar(
                     onValueChange = onTextChanged,
                     placeholder = {
                         Text(
-                            text = "Ask NOVA or say 'Hey NOVA'...",
-                            color = TextTertiary,
+                            text = "Say 'Hey NOVA' or ask anything...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontSize = 14.sp
                         )
                     },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = NeonCyan,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent
                     ),
@@ -414,7 +422,7 @@ private fun BottomControlBar(
                         Icon(
                             imageVector = Icons.Default.Send,
                             contentDescription = "Send",
-                            tint = NeonCyan
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -423,11 +431,14 @@ private fun BottomControlBar(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Center Pulsing Neon Mic Button
+        // Center Pulsing Mic Button
+        val primaryColor = MaterialTheme.colorScheme.primary
+        val secondaryColor = MaterialTheme.colorScheme.secondary
+
         val micGlow = if (orbState == OrbState.LISTENING) {
-            Brush.radialGradient(listOf(NeonCyan, NeonPurple))
+            Brush.radialGradient(listOf(primaryColor, secondaryColor))
         } else {
-            Brush.radialGradient(listOf(DarkCard, DarkSurface))
+            Brush.radialGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface))
         }
 
         Box(
@@ -435,14 +446,18 @@ private fun BottomControlBar(
                 .size(54.dp)
                 .clip(CircleShape)
                 .background(micGlow)
-                .border(1.5.dp, if (orbState == OrbState.LISTENING) NeonCyan else DarkBorder, CircleShape)
+                .border(
+                    1.5.dp,
+                    if (orbState == OrbState.LISTENING) primaryColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    CircleShape
+                )
                 .clickable(onClick = onMicClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = if (orbState == OrbState.LISTENING) Icons.Default.GraphicEq else Icons.Default.Mic,
                 contentDescription = "Microphone",
-                tint = if (orbState == OrbState.LISTENING) DarkVoid else NeonCyan,
+                tint = if (orbState == OrbState.LISTENING) MaterialTheme.colorScheme.onPrimary else primaryColor,
                 modifier = Modifier.size(26.dp)
             )
         }

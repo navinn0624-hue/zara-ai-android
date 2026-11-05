@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,14 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assistant.nova.domain.model.AgentAction
-import com.assistant.nova.ui.theme.DarkBorder
-import com.assistant.nova.ui.theme.DarkCard
-import com.assistant.nova.ui.theme.DarkVoid
-import com.assistant.nova.ui.theme.NeonCyan
-import com.assistant.nova.ui.theme.NeonPurple
 import com.assistant.nova.ui.theme.NeonRed
-import com.assistant.nova.ui.theme.TextPrimary
-import com.assistant.nova.ui.theme.TextSecondary
 
 @Composable
 fun ActionApprovalCard(
@@ -62,12 +56,15 @@ fun ActionApprovalCard(
         else -> "Action Approval Required"
     }
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(cardShape)
-            .background(DarkCard)
-            .border(1.5.dp, Brush.horizontalGradient(listOf(NeonCyan, NeonPurple)), cardShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.5.dp, Brush.horizontalGradient(listOf(primaryColor, secondaryColor)), cardShape)
             .padding(20.dp)
     ) {
         Column {
@@ -77,13 +74,13 @@ fun ActionApprovalCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(DarkBorder)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(8.dp)
                 ) {
                     Icon(
                         imageVector = actionIcon,
                         contentDescription = null,
-                        tint = NeonCyan
+                        tint = primaryColor
                     )
                 }
 
@@ -92,13 +89,13 @@ fun ActionApprovalCard(
                 Column {
                     Text(
                         text = actionTitle,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "User approval required by security policy",
-                        color = TextSecondary,
+                        text = "Voice command 'Yes' or tap Approve",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -108,7 +105,7 @@ fun ActionApprovalCard(
 
             Text(
                 text = prompt,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )
@@ -137,11 +134,11 @@ fun ActionApprovalCard(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = NeonCyan,
-                        contentColor = DarkVoid
+                        containerColor = primaryColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = DarkVoid)
+                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Approve", fontWeight = FontWeight.Bold)
                 }

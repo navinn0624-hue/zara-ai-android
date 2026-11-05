@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import com.assistant.nova.ui.theme.NeonCyan
 import com.assistant.nova.ui.theme.NeonMagenta
 import com.assistant.nova.ui.theme.NeonPurple
-import kotlin.math.cos
 import kotlin.math.sin
 
 enum class OrbState {
@@ -82,6 +82,9 @@ fun NovaOrb(
 
     val interactionSource = remember { MutableInteractionSource() }
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+
     Box(
         modifier = modifier
             .size(size)
@@ -99,29 +102,28 @@ fun NovaOrb(
             when (state) {
                 OrbState.IDLE -> {
                     val currentRadius = baseRadius * idleScale
-                    drawAmbientHalo(center, currentRadius * 1.4f, NeonPurple.copy(alpha = 0.25f))
-                    drawOrbBody(center, currentRadius, rotationDegrees = 0f)
+                    drawAmbientHalo(center, currentRadius * 1.4f, secondaryColor.copy(alpha = 0.35f))
+                    drawOrbBody(center, currentRadius, primaryColor, secondaryColor)
                 }
                 OrbState.LISTENING -> {
-                    // Responsive expansion driven by microphone RMS amplitude
                     val audioBoost = (rmsAmplitude * 0.35f)
                     val activeRadius = baseRadius * (1.05f + audioBoost)
-                    drawAmbientHalo(center, activeRadius * 1.55f, NeonCyan.copy(alpha = 0.4f + audioBoost * 0.4f))
-                    drawListeningRings(center, activeRadius, audioBoost)
-                    drawOrbBody(center, activeRadius, rotationDegrees = 0f)
+                    drawAmbientHalo(center, activeRadius * 1.55f, primaryColor.copy(alpha = 0.45f + audioBoost * 0.4f))
+                    drawListeningRings(center, activeRadius, audioBoost, primaryColor)
+                    drawOrbBody(center, activeRadius, primaryColor, secondaryColor)
                 }
                 OrbState.THINKING -> {
-                    drawAmbientHalo(center, baseRadius * 1.5f, NeonMagenta.copy(alpha = 0.35f))
+                    drawAmbientHalo(center, baseRadius * 1.5f, NeonMagenta.copy(alpha = 0.4f))
                     rotate(rotationDegrees, pivot = center) {
-                        drawOrbBody(center, baseRadius * 1.02f, rotationDegrees = rotationDegrees)
+                        drawOrbBody(center, baseRadius * 1.02f, primaryColor, secondaryColor)
                     }
                 }
                 OrbState.SPEAKING -> {
                     val speakingPulse = (1f + 0.08f * sin(wavePhase))
                     val speakingRadius = baseRadius * speakingPulse
-                    drawAmbientHalo(center, speakingRadius * 1.45f, NeonCyan.copy(alpha = 0.35f))
-                    drawHarmonicWaves(center, speakingRadius, wavePhase)
-                    drawOrbBody(center, speakingRadius, rotationDegrees = 0f)
+                    drawAmbientHalo(center, speakingRadius * 1.45f, primaryColor.copy(alpha = 0.4f))
+                    drawHarmonicWaves(center, speakingRadius, wavePhase, primaryColor)
+                    drawOrbBody(center, speakingRadius, primaryColor, secondaryColor)
                 }
             }
         }
@@ -140,14 +142,14 @@ private fun DrawScope.drawAmbientHalo(center: Offset, radius: Float, haloColor: 
     )
 }
 
-private fun DrawScope.drawOrbBody(center: Offset, radius: Float, rotationDegrees: Float) {
+private fun DrawScope.drawOrbBody(center: Offset, radius: Float, primary: Color, secondary: Color) {
     // Outer atmospheric glow
     drawCircle(
         brush = Brush.radialGradient(
             0.0f to Color.White.copy(alpha = 0.95f),
-            0.25f to NeonCyan.copy(alpha = 0.9f),
-            0.65f to NeonPurple.copy(alpha = 0.8f),
-            1.0f to Color(0xFF0F172A).copy(alpha = 0.1f),
+            0.28f to primary.copy(alpha = 0.9f),
+            0.68f to secondary.copy(alpha = 0.85f),
+            1.0f to primary.copy(alpha = 0.1f),
             center = center,
             radius = radius
         ),
@@ -160,8 +162,8 @@ private fun DrawScope.drawOrbBody(center: Offset, radius: Float, rotationDegrees
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.8f),
-                NeonCyan.copy(alpha = 0.3f),
+                Color.White.copy(alpha = 0.85f),
+                primary.copy(alpha = 0.4f),
                 Color.Transparent
             ),
             center = coreOffset,
@@ -172,21 +174,21 @@ private fun DrawScope.drawOrbBody(center: Offset, radius: Float, rotationDegrees
     )
 }
 
-private fun DrawScope.drawListeningRings(center: Offset, radius: Float, audioBoost: Float) {
+private fun DrawScope.drawListeningRings(center: Offset, radius: Float, audioBoost: Float, ringColor: Color) {
     val ringRadius = radius * (1.2f + audioBoost * 0.4f)
     drawCircle(
-        color = NeonCyan.copy(alpha = (0.5f - audioBoost * 0.2f).coerceAtLeast(0.1f)),
+        color = ringColor.copy(alpha = (0.55f - audioBoost * 0.2f).coerceAtLeast(0.15f)),
         radius = ringRadius,
         center = center,
         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx())
     )
 }
 
-private fun DrawScope.drawHarmonicWaves(center: Offset, radius: Float, phase: Float) {
+private fun DrawScope.drawHarmonicWaves(center: Offset, radius: Float, phase: Float, waveColor: Color) {
     for (i in 1..3) {
         val waveRadius = radius + (i * 14.dp.toPx() * (0.5f + 0.5f * sin(phase + i)))
         drawCircle(
-            color = NeonCyan.copy(alpha = (0.4f / i)),
+            color = waveColor.copy(alpha = (0.45f / i)),
             radius = waveRadius,
             center = center,
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())

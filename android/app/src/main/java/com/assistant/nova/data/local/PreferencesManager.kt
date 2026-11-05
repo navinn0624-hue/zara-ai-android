@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.assistant.nova.domain.model.LanguagePreference
+import com.assistant.nova.domain.model.ThemeMode
 
 class PreferencesManager(context: Context) {
 
@@ -37,9 +38,24 @@ class PreferencesManager(context: Context) {
         }
         set(value) = prefs.edit().putString(KEY_LANGUAGE_PREFERENCE, value.code).apply()
 
+    var themeMode: ThemeMode
+        get() {
+            val code = prefs.getString(KEY_THEME_MODE, ThemeMode.DARK.code) ?: ThemeMode.DARK.code
+            return ThemeMode.fromCode(code)
+        }
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value.code).apply()
+
     var wakeWordEnabled: Boolean
         get() = prefs.getBoolean(KEY_WAKE_WORD_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_WAKE_WORD_ENABLED, value).apply()
+
+    var isBackgroundListeningEnabled: Boolean
+        get() = prefs.getBoolean(KEY_BACKGROUND_LISTENING, true)
+        set(value) = prefs.edit().putBoolean(KEY_BACKGROUND_LISTENING, value).apply()
+
+    var isHandsFreeModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_HANDS_FREE_MODE, true)
+        set(value) = prefs.edit().putBoolean(KEY_HANDS_FREE_MODE, value).apply()
 
     var ttsSpeechRate: Float
         get() = prefs.getFloat(KEY_TTS_SPEECH_RATE, 1.0f)
@@ -63,7 +79,10 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_GEMINI_API_KEY = "gemini_api_key"
         private const val KEY_LANGUAGE_PREFERENCE = "language_preference"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_WAKE_WORD_ENABLED = "wake_word_enabled"
+        private const val KEY_BACKGROUND_LISTENING = "background_listening"
+        private const val KEY_HANDS_FREE_MODE = "hands_free_mode"
         private const val KEY_TTS_SPEECH_RATE = "tts_speech_rate"
         private const val KEY_TTS_PITCH = "tts_pitch"
         private const val KEY_AUTO_SPEAK = "auto_speak"
