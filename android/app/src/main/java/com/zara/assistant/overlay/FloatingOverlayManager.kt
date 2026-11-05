@@ -29,6 +29,8 @@ import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import com.zara.assistant.R
+import com.zara.assistant.engine.AppLauncherHelper
+import com.zara.assistant.engine.ContactsHelper
 import com.zara.assistant.engine.VoiceBrainEngine
 import com.zara.assistant.services.ZaraAccessibilityService
 import java.util.Locale
@@ -61,14 +63,20 @@ object FloatingOverlayManager {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             y = 35
         }
 
-        windowManager?.addView(overlayView, layoutParams)
+        try {
+            windowManager?.addView(overlayView, layoutParams)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return
+        }
 
         vibrate(context)
         startSiriAnimations()
@@ -82,6 +90,7 @@ object FloatingOverlayManager {
             startSpeechListening(context)
         }
 
+        // 100% Hands-free: Starts listening automatically
         startSpeechListening(context)
     }
 
@@ -141,7 +150,7 @@ object FloatingOverlayManager {
 
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                tvStatus?.text = "Listening... Speak in Tamil, English, or Tanglish ✨"
+                tvStatus?.text = "Listening... Speak now ✨"
             }
 
             override fun onBeginningOfSpeech() {}
@@ -162,7 +171,8 @@ object FloatingOverlayManager {
             }
 
             override fun onError(error: Int) {
-                tvStatus?.text = "Didn't catch that. Tap the orb to speak."
+                tvStatus?.text = "Didn't catch that. Tap orb to speak."
+                autoDismiss(3000)
             }
 
             override fun onResults(results: Bundle?) {
@@ -191,6 +201,47 @@ object FloatingOverlayManager {
         val tvStatus = overlayView?.findViewById<TextView>(R.id.tvAssistantStatus)
 
         VoiceBrainEngine.process(context, command, object : VoiceBrainEngine.CommandCallback {
+            override fun onPhoneCall(contactOrNumber: String) {
+                // Hands-free phone call directly to Amma or any contact
+                tvStatus?.text = "Calling $contactOrNumber hands-free... 📞"
+                speak("$contactOrNumber-ku call panren")
+
+                var finalNumber = contactOrNumber
+                if (!contactOrNumber.all { it.isDigit() || it == '+' }) {
+                    val resolved = ContactsHelper.findPhoneNumber(context, contactOrNumber)
+                    if (resolved != null) {
+                        finalNumber = resolved
+                    }
+                }
+
+                try {
+                    val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${Uri.encode(finalNumber)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(callIntent)
+                } catch (e: SecurityException) {
+                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(finalNumber)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(dialIntent)
+                } catch (e: Exception) {
+                    tvStatus?.text = "Cannot call: ${e.message}"
+                }
+                autoDismiss(2200)
+            }
+
+            override fun onAppOpen(appName: String) {
+                tvStatus?.text = "Opening $appName hands-free..."
+                speak("$appName open panren")
+
+                val service = ZaraAccessibilityService.instance
+                var opened = service?.launchAppByName(appName) ?: false
+                if (!opened) {
+                    opened = AppLauncherHelper.launch(context, appName)
+                }
+                autoDismiss(1800)
+            }
+
             override fun onWhatsAppSend(contact: String, message: String) {
                 tvStatus?.text = "Opening WhatsApp & sending to $contact..."
                 speak("WhatsApp-la $contact-ku message anupuren...")
@@ -290,21 +341,6 @@ object FloatingOverlayManager {
                 autoDismiss(1800)
             }
 
-            override fun onPhoneCall(contactOrNumber: String) {
-                tvStatus?.text = "Calling $contactOrNumber 📞"
-                speak("$contactOrNumber-ku call panren")
-
-                try {
-                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$contactOrNumber")).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    tvStatus?.text = "Cannot make call"
-                }
-                autoDismiss(1800)
-            }
-
             override fun onYouTubePlay(query: String) {
                 tvStatus?.text = "Playing $query on YouTube ▶️"
                 speak("YouTube-la $query play panren")
@@ -321,23 +357,6 @@ object FloatingOverlayManager {
                     context.startActivity(webIntent)
                 }
                 autoDismiss(2000)
-            }
-
-            override fun onAppOpen(appName: String) {
-                tvStatus?.text = "Opening $appName..."
-                speak("$appName open panren")
-
-                val service = ZaraAccessibilityService.instance
-                val opened = service?.launchAppByName(appName) ?: false
-                if (!opened) {
-                    val pm = context.packageManager
-                    val intent = pm.getLaunchIntentForPackage("com.$appName.android")
-                    if (intent != null) {
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(intent)
-                    }
-                }
-                autoDismiss(1800)
             }
 
             override fun onConversational(reply: String) {
