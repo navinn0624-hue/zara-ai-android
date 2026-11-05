@@ -1,0 +1,8 @@
+{
+  "name": "nova-ai-assistant",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build:apk": "node build_and_download_apk.js"
+  }
+}

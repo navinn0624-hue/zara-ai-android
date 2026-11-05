@@ -1,0 +1,9 @@
+## This file must NOT be checked into Version Control Systems.
+# Location of the SDK. This is only used by Gradle.
+# For Windows, use double backslashes or forward slashes, e.g.:
+# sdk.dir=C\:\\Users\\YourUsername\\AppData\\Local\\Android\\Sdk
+sdk.dir=C\:\\Users\\navin\\AppData\\Local\\Android\\Sdk
+
+# Optional: You can provide a default Gemini API key for local debug builds
+# Alternatively and recommended: Enter it securely via the app's Settings screen!
+# GEMINI_API_KEY=AIzaSy...
